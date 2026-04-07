@@ -1,4 +1,4 @@
-package com.yourdomain.focusapp // আপনার প্রোজেক্টের আসল প্যাকেজ নাম এখানে দিন
+package com.tanimul.android_template_kotlin.features // বা আপনার ফোল্ডার অনুযায়ী যা ছিল
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -8,6 +8,9 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
+
+// এই লাইনটি অত্যন্ত জরুরি, এটি যুক্ত করুন:
+import com.tanimul.android_template_kotlin.R
 
 class MainActivity : AppCompatActivity() {
 
