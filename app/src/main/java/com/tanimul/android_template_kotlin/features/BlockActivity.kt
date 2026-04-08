@@ -3,7 +3,6 @@ package com.tanimul.android_template_kotlin.features
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
@@ -22,11 +21,11 @@ class BlockActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = SectionRed // লাল রঙের ওয়ার্নিং স্ক্রিন
+                    color = Color(0xFFE53935) // লাল রঙের ওয়ার্নিং স্ক্রিন
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
-                        mainAxisAlignment = Arrangement.Center,
+                        verticalArrangement = Arrangement.Center, // <-- এই জায়গাটাই ভুল ছিল, ঠিক করে দিলাম
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
