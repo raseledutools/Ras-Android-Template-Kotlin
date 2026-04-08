@@ -1,12 +1,13 @@
 package com.tanimul.android_template_kotlin.features
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-// এই অংশটুকু অ্যাপের সুইচের ডাটা সেভ রাখবে
 data class BlockerHeroUiState(
     val blockAdultContent: Boolean = false,
     val blockImageSearch: Boolean = false,
@@ -20,13 +21,29 @@ data class BlockerHeroUiState(
     val blockedScreenCountdown: Boolean = false
 )
 
-class BlockerHeroViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow(BlockerHeroUiState())
+// AndroidViewModel ব্যবহার করছি যাতে সহজেই লোকাল মেমোরি (SharedPreferences) ব্যবহার করা যায়
+class BlockerHeroViewModel(application: Application) : AndroidViewModel(application) {
+    
+    // অ্যাপের মেমোরি তৈরি করা হলো
+    private val prefs = application.getSharedPreferences("BlockerPrefs", Context.MODE_PRIVATE)
+
+    private val _uiState = MutableStateFlow(
+        BlockerHeroUiState(
+            // অ্যাপ ওপেন হলে মেমোরি থেকে আগের সেভ করা ডেটা পড়বে
+            blockYoutubeShorts = prefs.getBoolean("blockYoutubeShorts", false)
+            // (বাকিগুলোও পরে এভাবে যোগ করা যাবে)
+        )
+    )
     val uiState: StateFlow<BlockerHeroUiState> = _uiState.asStateFlow()
+
+    // যখনই ইউজার সুইচ অন/অফ করবে, তখন মেমোরিতে সেভ হয়ে যাবে
+    fun updateYoutubeShorts(checked: Boolean) {
+        prefs.edit().putBoolean("blockYoutubeShorts", checked).apply()
+        _uiState.update { it.copy(blockYoutubeShorts = checked) }
+    }
 
     fun updateAdultContent(checked: Boolean) { _uiState.update { it.copy(blockAdultContent = checked) } }
     fun updateImageSearch(checked: Boolean) { _uiState.update { it.copy(blockImageSearch = checked) } }
-    fun updateYoutubeShorts(checked: Boolean) { _uiState.update { it.copy(blockYoutubeShorts = checked) } }
     fun updateUninstallProtection(checked: Boolean) { _uiState.update { it.copy(uninstallProtection = checked) } }
     fun updatePhoneReboot(checked: Boolean) { _uiState.update { it.copy(blockPhoneReboot = checked) } }
     fun updateRecentApps(checked: Boolean) { _uiState.update { it.copy(blockRecentAppsScreen = checked) } }
