@@ -1,5 +1,4 @@
-package com.tanimul.android_template_kotlin
-
+package com.tanimul.android_template_kotlin.features
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
