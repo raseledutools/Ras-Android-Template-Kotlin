@@ -1,11 +1,13 @@
 package com.tanimul.android_template_kotlin.features
+
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import com.tanimul.android_template_kotlin.features.BlockerHeroApp
-import com.tanimul.android_template_kotlin.features.BlockerHeroViewModel
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 
 class MainActivity : ComponentActivity() {
     
@@ -16,8 +18,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                // আপনার UI স্ক্রিনকে কল করা হচ্ছে
-                BlockerHeroApp(viewModel = viewModel)
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    // আপনার UI স্ক্রিনকে কল করা হচ্ছে
+                    BlockerHeroApp(viewModel = viewModel)
+                }
             }
         }
     }
