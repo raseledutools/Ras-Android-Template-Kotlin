@@ -1,26 +1,23 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
-
-    alias(libs.plugins.google.dagger.hilt.android)
-    alias(libs.plugins.kotlin.kapt)
-    alias(libs.plugins.google.devtools.ksp)
-    alias(libs.plugins.navSafeArgs)
-    alias(libs.plugins.kotlin.parcelize)
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
     namespace = "com.tanimul.android_template_kotlin"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.tanimul.android_template_kotlin"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
     }
 
     buildTypes {
@@ -33,85 +30,53 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "1.8"
     }
-
     buildFeatures {
-        dataBinding = true
-        viewBinding = true
-        buildConfig = true
+        compose = true
     }
-
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.1" // আপনার প্রোজেক্টের কটলিন ভার্সন অনুযায়ী এটি ১.৪ বা ১.৫ হতে পারে
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
 }
 
 dependencies {
+    // Core Android dependencies
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    
+    // Compose lifecycle and activity
+    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.constraintlayout)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    // Compose BOM (Bill of Materials) - এটি সব কম্পোজ লাইব্রেরির ভার্সন কন্ট্রোল করে
+    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    
+    // Compose UI & Material 3
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    
+    // Material Icons Extended (আপনার ডিজাইনের আইকনগুলোর জন্য অত্যন্ত জরুরি)
+    implementation("androidx.compose.material:material-icons-extended")
 
-    // Lifecycle components
-    implementation(libs.lifecycle.viewmodel.ktx)
-    implementation(libs.lifecycle.livedata.ktx)
-    implementation(libs.lifecycle.common.java8)
-
-    // Coroutines
-    api(libs.coroutines.core)
-    api(libs.coroutines.android)
-    implementation(libs.coroutines.core)
-
-    //Shimmer Effect
-    implementation(libs.shimmer)
-
-    // Circular Imageview
-    implementation(libs.circleimageview)
-
-    // Glide
-    implementation(libs.glide.library)
-    annotationProcessor(libs.glide.compiler)
-
-    //Lottie animation
-    implementation(libs.lottie)
-
-    // Retrofit
-    implementation(libs.retrofit.core)
-    implementation(libs.retrofit.converter.gson)
-    implementation(libs.okhttp.logging.interceptor)
-
-    // Gson
-    implementation(libs.gson)
-
-    //Room for local data storage
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
-    androidTestImplementation(libs.androidx.room.testing)
-
-    // Logging with Timber
-    implementation(libs.timber)
-
-    // Dependency Injection with Hilt
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
-    implementation(libs.hilt.navigation.fragment)
-
-    // Data storage and preferences
-    implementation(libs.androidx.datastore.preferences)
-
-    // Avatar image generator from name
-    implementation (libs.avatarx)
-
-    // Paging
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.rxjava3)
-    implementation (libs.rxandroid)
-    implementation (libs.rxjava3.retrofit.adapter)
+    // Testing
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
