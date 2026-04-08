@@ -1,5 +1,8 @@
 package com.tanimul.android_template_kotlin.features
 
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -17,11 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// সরাসরি কালার ভেরিয়েবলগুলো দিয়ে দেওয়া হলো, যাতে কোনো ইমপোর্ট এরর না আসে
 val DarkBackground = Color(0xFF121212)
 val AppBackground = Color(0xFFF5F5F5)
 val SectionRed = Color(0xFFE53935)
@@ -29,9 +32,17 @@ val SectionBlue = Color(0xFF1E88E5)
 val SectionGreen = Color(0xFF43A047)
 val SwitchGreenON = Color(0xFF4CAF50)
 
+// পারমিশন চেক করার ছোট্ট ফাংশন
+fun isAccessibilityEnabled(context: Context): Boolean {
+    val enabledServices = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ) ?: return false
+    return enabledServices.contains(context.packageName)
+}
+
 @Composable
 fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
-    // collectAsState() ব্যবহার করা হলো যাতে কোনো এক্সট্রা লাইব্রেরি এরর না দেয়
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
@@ -212,6 +223,8 @@ fun PartnerInfoRow() {
 
 @Composable
 fun SettingToggleRow(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val context = LocalContext.current // কন্টেক্সট নেওয়া হলো
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -219,7 +232,15 @@ fun SettingToggleRow(title: String, isChecked: Boolean, onCheckedChange: (Boolea
         Text(text = title, fontSize = 14.sp, color = Color.Black, modifier = Modifier.weight(1f))
         Switch(
             checked = isChecked,
-            onCheckedChange = { onCheckedChange(it) },
+            onCheckedChange = { newValue ->
+                if (newValue && !isAccessibilityEnabled(context)) {
+                    // পারমিশন না থাকলে সরাসরি সেটিংসে নিয়ে যাবে
+                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                } else {
+                    // পারমিশন থাকলে বাটন অন হবে
+                    onCheckedChange(newValue)
+                }
+            },
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = SwitchGreenON,
