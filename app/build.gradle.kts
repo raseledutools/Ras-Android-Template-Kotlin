@@ -1,10 +1,8 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // Kotlin 2.0 এর জন্য নতুন Compose Compiler প্লাগিন
-    id("org.jetbrains.kotlin.plugin.compose") 
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" // এখানে version "2.0.0" যোগ করা হয়েছে
 }
-
 android {
     namespace = "com.tanimul.android_template_kotlin"
     compileSdk = 34
