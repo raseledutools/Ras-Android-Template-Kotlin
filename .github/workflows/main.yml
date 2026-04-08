@@ -22,8 +22,9 @@ jobs:
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
-      - name: Build APK with Gradle
-        run: ./gradlew assembleDebug
+      # এখানে clean কমান্ডটি যোগ করা হয়েছে পুরনো ক্যাশ মুছে ফেলার জন্য
+      - name: Build APK with Gradle (Clean Build)
+        run: ./gradlew clean assembleDebug
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
