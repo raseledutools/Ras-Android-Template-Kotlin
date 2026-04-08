@@ -20,12 +20,19 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.tanimul.android_template_kotlin.ui.theme.* // Color.kt ইমপোর্ট করা হলো
+
+// সরাসরি কালার ভেরিয়েবলগুলো দিয়ে দেওয়া হলো, যাতে কোনো ইমপোর্ট এরর না আসে
+val DarkBackground = Color(0xFF121212)
+val AppBackground = Color(0xFFF5F5F5)
+val SectionRed = Color(0xFFE53935)
+val SectionBlue = Color(0xFF1E88E5)
+val SectionGreen = Color(0xFF43A047)
+val SwitchGreenON = Color(0xFF4CAF50)
 
 @Composable
 fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    // collectAsState() ব্যবহার করা হলো যাতে কোনো এক্সট্রা লাইব্রেরি এরর না দেয়
+    val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = { BlockerHeroTopAppBar() },
