@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" 
-    id("com.google.gms.google-services") // ফায়ারবেসের জন্য নতুন প্লাগিন যোগ করা হয়েছে
+    id("com.google.gms.google-services") version "4.4.1" // এখানেই সরাসরি ভার্সন যোগ করে দেওয়া হয়েছে
 }
 
 android {
@@ -71,7 +71,7 @@ dependencies {
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Firebase (নতুন যোগ করা হয়েছে রিমোট কন্ট্রোলের জন্য)
+    // Firebase (রিমোট কন্ট্রোলের জন্য)
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-database")
