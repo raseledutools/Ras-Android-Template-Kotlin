@@ -27,7 +27,7 @@ class BlockActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // পাহারাদার (Service) থেকে কোন কারণে ব্লক হয়েছে, সেটা রিসিভ করা
+        // পাহারাদার (Service) থেকে কোন কারণে ব্লক হয়েছে, সেটা রিসিভ করা
         val reason = intent.getStringExtra("BLOCK_REASON") ?: "LOCKED"
 
         setContent {
@@ -48,48 +48,50 @@ data class BlockState(
 
 @Composable
 fun BlockScreen(reason: String) {
-    // C++ থেকে আনা ইসলামিক এবং টাইম কোটস
+    // আপনার পছন্দমতো ইসলামিক এবং টাইম কোটস (C++ লজিক অনুযায়ী)
     val islamicQuotes = listOf(
         "\"মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে এবং তাদের যৌনাঙ্গর হেফাযত করে।\"\n- (সূরা আন-নূর: ৩০)",
-        "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\"\n- (সহীহ বুখারী)"
+        "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\"\n- (সহীহ বুখারী)",
+        "\"চোখের যিনা হলো (হারাম জিনিসের দিকে) তাকানো।\"\n- (মুসলিম)"
     )
     val timeQuotes = listOf(
         "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\"\n- এ.পি.জে. আবদুল কালাম",
-        "\"সফলতা কোনো ম্যাজিক নয়, এটি হলো ফোকাস এবং পরিশ্রমের ফল।\""
+        "\"সফলতা কোনো ম্যাজিক নয়, এটি হলো ফোকাস এবং পরিশ্রমের ফল।\"",
+        "\"সময়ের সঠিক ব্যবহারই জীবনকে সুন্দর করে।\""
     )
 
-    // ব্লকের কারণ অনুযায়ী স্ক্রিনের রঙ, আইকন এবং কোটেশন পরিবর্তন হবে
+    // ব্লকের কারণ অনুযায়ী স্ক্রিনের রঙ, আইকন এবং কোটেশন পরিবর্তন
     val state = when (reason) {
         "ADULT" -> BlockState(
             icon = Icons.Default.Warning,
-            title = "RESTRICTED CONTENT",
-            color = Color(0xFFEF4444), // লাল
+            title = "CONTENT RESTRICTED",
+            color = Color(0xFFEF4444), // লাল (সতর্কবার্তা)
             quote = islamicQuotes[Random.nextInt(islamicQuotes.size)]
         )
         "SECURITY" -> BlockState(
             icon = Icons.Default.Security,
-            title = "SECURITY ALERT",
-            color = Color(0xFFF59E0B), // হলুদ/অরেঞ্জ
-            quote = "Uninstalling or bypassing is not allowed while focus mode is active."
+            title = "SECURITY PROTECTION",
+            color = Color(0xFFF59E0B), // অরেঞ্জ
+            quote = "Uninstalling or bypassing protection is active for the selected duration."
         )
         "NEW_APP" -> BlockState(
             icon = Icons.Default.Lock,
             title = "INSTALLATION BLOCKED",
             color = Color(0xFF3B82F6), // নীল
-            quote = "You cannot install or open new apps during focus time."
+            quote = "New app installation is currently restricted in Focus Mode."
         )
-        else -> BlockState( // "LOCKED" বা রেগুলার ব্লকের জন্য
+        else -> BlockState(
             icon = Icons.Default.Lock,
             title = "FOCUS MODE ACTIVE",
-            color = Color(0xFF15AABF), // Rasfocus থিম কালার (টিয়াল)
+            color = Color(0xFF15AABF), // Rasfocus থিম কালার
             quote = timeQuotes[Random.nextInt(timeQuotes.size)]
         )
     }
 
-    // আপনার রিকোয়ারমেন্ট অনুযায়ী একদম ক্লিন এবং হোয়াইট ব্যাকগ্রাউন্ড UI
+    // হোয়াইট এবং ক্লিন প্রফেশনাল UI
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF8FAFC) // হালকা গ্রে-সাদা ব্যাকগ্রাউন্ড
+        color = Color(0xFFF8FAFC)
     ) {
         Column(
             modifier = Modifier
@@ -98,7 +100,7 @@ fun BlockScreen(reason: String) {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // আইকনের সুন্দর একটি বৃত্তাকার ব্যাকগ্রাউন্ড
+            // আইকনের বৃত্তাকার ব্যাকগ্রাউন্ড
             Surface(
                 shape = CircleShape,
                 color = state.color.copy(alpha = 0.1f),
@@ -124,12 +126,12 @@ fun BlockScreen(reason: String) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // উক্তি বা মেসেজ দেখানোর জন্য সুন্দর বর্ডার দেওয়া কার্ড
+            // উক্তি দেখানোর জন্য বর্ডার দেওয়া কার্ড
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(16.dp),
                 color = Color.White,
                 border = BorderStroke(2.dp, state.color),
-                shadowElevation = 4.dp,
+                shadowElevation = 6.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
@@ -138,17 +140,18 @@ fun BlockScreen(reason: String) {
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(28.dp),
                     lineHeight = 28.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
             Text(
-                text = "Go back to your work. Focus on what matters.",
+                text = "Keep focusing on your goal.",
                 color = Color(0xFF64748B),
-                fontSize = 14.sp,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center
             )
         }
