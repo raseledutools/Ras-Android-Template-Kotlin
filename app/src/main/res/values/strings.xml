@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Android-Template-Kotlin</string>
+    <string name="app_name">Rasfocus</string>
 
     <string name="please_wait">Please wait</string>
     <string name="error_permission_required">Permission Required</string>
