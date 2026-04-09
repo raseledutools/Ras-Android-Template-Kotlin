@@ -29,6 +29,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// গ্লোবাল কালার প্যালেট
+val bgColor = Color(0xFFF8FAFC)
+val cardColor = Color(0xFFFFFFFF)
+val primaryColor = Color(0xFF15AABF)
+val dangerColor = Color(0xFFEF4444)
+val successColor = Color(0xFF10B981)
+val textColor = Color(0xFF1E293B)
+val mutedColor = Color(0xFF64748B)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
@@ -38,14 +47,6 @@ fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
     // Session states
     var isUnlockedForSession by remember { mutableStateOf(false) }
     var isStrictBreakActive by remember { mutableStateOf(false) } // This will later come from ViewModel
-
-    // কালার প্যালেট
-    val bgColor = Color(0xFFF8FAFC)
-    val cardColor = Color(0xFFFFFFFF)
-    val primaryColor = Color(0xFF15AABF)
-    val dangerColor = Color(0xFFEF4444)
-    val successColor = Color(0xFF10B981)
-    val textColor = Color(0xFF1E293B)
 
     // ১. STRICT BREAK SCREEN (Back button blocked)
     if (isStrictBreakActive) {
