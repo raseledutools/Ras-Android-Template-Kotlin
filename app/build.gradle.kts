@@ -1,8 +1,10 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" // এখানে version "2.0.0" যোগ করা হয়েছে
+    id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" 
+    id("com.google.gms.google-services") // ফায়ারবেসের জন্য নতুন প্লাগিন যোগ করা হয়েছে
 }
+
 android {
     namespace = "com.tanimul.android_template_kotlin"
     compileSdk = 34
@@ -39,7 +41,6 @@ android {
     buildFeatures {
         compose = true
     }
-    // এখান থেকে composeOptions ব্লকটি পুরোপুরি মুছে ফেলা হয়েছে
     
     packaging {
         resources {
@@ -69,6 +70,11 @@ dependencies {
     
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Firebase (নতুন যোগ করা হয়েছে রিমোট কন্ট্রোলের জন্য)
+    implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-database")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
