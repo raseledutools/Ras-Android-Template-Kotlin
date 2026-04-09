@@ -1,255 +1,229 @@
 package com.tanimul.android_template_kotlin.features
 
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.HelpOutline
-import androidx.compose.material.icons.outlined.ListAlt
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-val DarkBackground = Color(0xFF121212)
-val AppBackground = Color(0xFFF5F5F5)
-val SectionRed = Color(0xFFE53935)
-val SectionBlue = Color(0xFF1E88E5)
-val SectionGreen = Color(0xFF43A047)
-val SwitchGreenON = Color(0xFF4CAF50)
-
-// পারমিশন চেক করার ছোট্ট ফাংশন
-fun isAccessibilityEnabled(context: Context): Boolean {
-    val enabledServices = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-    ) ?: return false
-    return enabledServices.contains(context.packageName)
-}
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
+
+    // কালার প্যালেট (HTML ড্যাশবোর্ডের মতো প্রফেশনাল সাদা থিম)
+    val bgColor = Color(0xFFF8FAFC)
+    val cardColor = Color(0xFFFFFFFF)
+    val primaryColor = Color(0xFF15AABF)
+    val dangerColor = Color(0xFFEF4444)
+    val successColor = Color(0xFF10B981)
+    val textColor = Color(0xFF1E293B)
+    val mutedColor = Color(0xFF64748B)
 
     Scaffold(
-        topBar = { BlockerHeroTopAppBar() },
-        bottomBar = { BlockerHeroBottomNavigationBar() }
-    ) { innerPadding ->
+        topBar = {
+            TopAppBar(
+                title = { Text("👁️ Rasfocus Pro", fontWeight = FontWeight.Bold, color = textColor) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = cardColor,
+                    titleContentColor = textColor
+                )
+            )
+        },
+        containerColor = bgColor
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(DarkBackground)
-                .padding(innerPadding)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(paddingValues)
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            ElevatedCard(
-                modifier = Modifier.fillMaxSize(),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                colors = CardDefaults.elevatedCardColors(containerColor = Color.White)
+            
+            // 1. DEVICE STATUS CARD
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardColor),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                BlockingSettingsList(uiState, viewModel)
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun BlockerHeroTopAppBar() {
-    TopAppBar(
-        title = { },
-        actions = {
-            OutlinedButton(
-                onClick = { /* GUIDE */ },
-                border = androidx.compose.foundation.BorderStroke(1.dp, SectionRed),
-                shape = CircleShape,
-                modifier = Modifier.height(36.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu", tint = SectionRed, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = "GUIDE", color = SectionRed, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            BadgedBox(
-                badge = { Badge(containerColor = SectionRed, modifier = Modifier.size(8.dp)) {} },
-                modifier = Modifier.padding(end = 16.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.Gray)
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
-    )
-}
-
-@Composable
-fun BlockerHeroBottomNavigationBar() {
-    NavigationBar(containerColor = Color.White, modifier = Modifier.height(60.dp)) {
-        NavigationBarItem(
-            selected = true,
-            onClick = { },
-            icon = { Icon(imageVector = Icons.Default.Block, contentDescription = "Blocking", tint = SectionRed) },
-            label = { Text("Blocking", color = SectionRed, fontSize = 10.sp) },
-            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.White)
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = { Icon(imageVector = Icons.Outlined.ListAlt, contentDescription = "Menu", tint = Color.Gray) },
-            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.White)
-        )
-        NavigationBarItem(
-            selected = false,
-            onClick = { },
-            icon = {
-                Surface(
-                    color = SectionRed,
-                    shape = CircleShape,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Schedule, contentDescription = "Focus", tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Focus Mo", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("Device Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    if (uiState.isRemotelyLocked) {
+                        Text("🔒 LOCKED BY ADMIN", color = dangerColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        Text("Your device is strictly locked for focus.", color = mutedColor, fontSize = 14.sp)
+                    } else {
+                        Text("🔓 UNLOCKED", color = successColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                        Text("Your device is free to use.", color = mutedColor, fontSize = 14.sp)
                     }
                 }
-            },
-            colors = NavigationBarItemDefaults.colors(indicatorColor = Color.White)
-        )
-    }
-}
+            }
 
-@Composable
-fun BlockingSettingsList(uiState: BlockerHeroUiState, viewModel: BlockerHeroViewModel) {
-    LazyColumn(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        item { Spacer(modifier = Modifier.height(16.dp)) }
-        
-        item {
-            SectionGroupCard("Accountability Partner", SectionBlue, Icons.Default.People) {
-                PartnerInfoRow()
-            }
-        }
-        item {
-            SectionGroupCard("Content Blocking", SectionRed, Icons.Default.Block) {
-                SettingToggleRow("Block Adult content", uiState.blockAdultContent, viewModel::updateAdultContent)
-                SettingToggleRow("Block Image/Video search", uiState.blockImageSearch, viewModel::updateImageSearch)
-                SettingToggleRow("Block YouTube shorts", uiState.blockYoutubeShorts, viewModel::updateYoutubeShorts)
-            }
-        }
-        item {
-            SectionGroupCard("Uninstall Protection", SectionGreen, Icons.Default.Lock) {
-                SettingToggleRow("Uninstall & Settings Protection", uiState.uninstallProtection, viewModel::updateUninstallProtection)
-                SettingToggleRow("Block Phone Reboot option", uiState.blockPhoneReboot, viewModel::updatePhoneReboot)
-                SettingToggleRow("Block Recent Apps Screen", uiState.blockRecentAppsScreen, viewModel::updateRecentApps)
-            }
-        }
-        item {
-            SectionGroupCard("Advanced features", SectionBlue, Icons.Default.Settings) {
-                SettingToggleRow("Block Unsupported Browsers", uiState.blockUnsupportedBrowsers, viewModel::updateUnsupportedBrowsers)
-                SettingToggleRow("Block New Installed Apps", uiState.blockNewInstalledApps, viewModel::updateNewInstalledApps)
-                SettingToggleRow("Block Notification panel", uiState.blockNotificationPanel, viewModel::updateNotificationPanel)
-                SettingToggleRow("Blocked Screen Countdown", uiState.blockedScreenCountdown, viewModel::updateScreenCountdown)
-            }
-        }
-    }
-}
-
-@Composable
-fun SectionGroupCard(title: String, color: Color, icon: ImageVector, content: @Composable () -> Unit) {
-    Box(modifier = Modifier.padding(vertical = 12.dp)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp)
-                .border(1.dp, color.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
-                .padding(top = 20.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
-        ) {
-            content()
-        }
-        Surface(
-            color = color,
-            shape = CircleShape,
-            modifier = Modifier.align(Alignment.TopCenter).offset(y = (-4).dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            // 2. MAGICX FEATURES CARD (Adult Block Hidden)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardColor),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text(text = title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("⚙️ MagicX Features", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor)
+                    Text("Block distractive content instantly.", color = mutedColor, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    SettingSwitch(
+                        title = "Block YouTube Shorts",
+                        isChecked = uiState.blockYoutubeShorts,
+                        onCheckedChange = { viewModel.toggleYoutubeShorts(it) },
+                        primaryColor = primaryColor
+                    )
+                    Divider(color = Color(0xFFF1F5F9))
+                    SettingSwitch(
+                        title = "Block Facebook Reels",
+                        isChecked = uiState.blockFacebookReels,
+                        onCheckedChange = { viewModel.toggleFacebookReels(it) },
+                        primaryColor = primaryColor
+                    )
+                }
             }
+
+            // 3. STRICT SECURITY CARD
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardColor),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("🛡️ Strict Security", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor)
+                    Text("Prevent bypassing focus mode.", color = mutedColor, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    SettingSwitch(
+                        title = "App Uninstall Protection",
+                        isChecked = uiState.uninstallProtection,
+                        onCheckedChange = { viewModel.toggleUninstallProtection(it) },
+                        primaryColor = primaryColor
+                    )
+                    Divider(color = Color(0xFFF1F5F9))
+                    SettingSwitch(
+                        title = "Block Phone Reboot",
+                        isChecked = uiState.blockPhoneReboot,
+                        onCheckedChange = { viewModel.togglePhoneReboot(it) },
+                        primaryColor = primaryColor
+                    )
+                    Divider(color = Color(0xFFF1F5F9))
+                    SettingSwitch(
+                        title = "Block Recent Apps Screen",
+                        isChecked = uiState.blockRecentAppsScreen,
+                        onCheckedChange = { viewModel.toggleRecentAppsScreen(it) },
+                        primaryColor = primaryColor
+                    )
+                    Divider(color = Color(0xFFF1F5F9))
+                    SettingSwitch(
+                        title = "Block Installing New Apps",
+                        isChecked = uiState.blockNewInstalledApps,
+                        onCheckedChange = { viewModel.toggleNewInstalledApps(it) },
+                        primaryColor = primaryColor
+                    )
+                }
+            }
+
+            // 4. LIVE CHAT CARD
+            var chatMessage by remember { mutableStateOf("") }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardColor),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text("💬 Live Chat Support", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = textColor)
+                    
+                    if (uiState.adminMessage.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = Color(0xFFFFFBEB),
+                            border = BorderStroke(1.dp, Color(0xFFFDE68A)),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Admin: ${uiState.adminMessage}", modifier = Modifier.padding(12.dp), color = Color(0xFF92400E), fontWeight = FontWeight.Medium)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = chatMessage,
+                        onValueChange = { chatMessage = it },
+                        placeholder = { Text("Message to admin...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                if (chatMessage.isNotEmpty()) {
+                                    viewModel.sendLiveChatMessage(chatMessage)
+                                    chatMessage = ""
+                                }
+                            }) {
+                                Icon(Icons.Default.Send, contentDescription = "Send", tint = primaryColor)
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = primaryColor,
+                            unfocusedBorderColor = Color(0xFFE2E8F0)
+                        )
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
 @Composable
-fun PartnerInfoRow() {
+fun SettingSwitch(
+    title: String,
+    isChecked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    primaryColor: Color
+) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text("My Partner", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
-            Text("shaxxxxxxxxxx@gmail.com", fontSize = 12.sp, color = Color.Gray)
-        }
-        OutlinedButton(
-            onClick = { /* রিমুভ লজিক */ },
-            border = androidx.compose.foundation.BorderStroke(1.dp, SectionRed.copy(alpha = 0.5f)),
-            shape = CircleShape,
-            modifier = Modifier.height(32.dp),
-            contentPadding = PaddingValues(horizontal = 12.dp)
-        ) {
-            Text("Remove", color = SectionRed, fontSize = 12.sp)
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Icon(imageVector = Icons.Outlined.HelpOutline, contentDescription = "Help", tint = Color.Gray, modifier = Modifier.size(20.dp))
-    }
-}
-
-@Composable
-fun SettingToggleRow(title: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val context = LocalContext.current // কন্টেক্সট নেওয়া হলো
-
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = title, fontSize = 14.sp, color = Color.Black, modifier = Modifier.weight(1f))
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            color = Color(0xFF334155),
+            modifier = Modifier.weight(1f)
+        )
         Switch(
             checked = isChecked,
-            onCheckedChange = { newValue ->
-                if (newValue && !isAccessibilityEnabled(context)) {
-                    // পারমিশন না থাকলে সরাসরি সেটিংসে নিয়ে যাবে
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                } else {
-                    // পারমিশন থাকলে বাটন অন হবে
-                    onCheckedChange(newValue)
-                }
-            },
+            onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = Color.White,
-                checkedTrackColor = SwitchGreenON,
+                checkedTrackColor = primaryColor,
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color.LightGray
-            ),
-            modifier = Modifier.scale(0.8f)
+                uncheckedTrackColor = Color(0xFFCBD5E1),
+                uncheckedBorderColor = Color.Transparent
+            )
         )
-        Spacer(modifier = Modifier.width(8.dp))
-        Icon(imageVector = Icons.Outlined.HelpOutline, contentDescription = "Help", tint = Color.Gray, modifier = Modifier.size(20.dp))
     }
 }
