@@ -15,43 +15,52 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 data class BlockerHeroUiState(
-    val blockAdultContent: Boolean = false,
-    val blockImageSearch: Boolean = false,
+    // Master Lock
+    val isRemotelyLocked: Boolean = false,
+    
+    // MagicX Features
+    val blockAdultContent: Boolean = false, // (Dashboard Only - No UI toggle)
     val blockYoutubeShorts: Boolean = false,
+    val blockFacebookReels: Boolean = false,
+    
+    // Strict Security
     val uninstallProtection: Boolean = false,
-    val blockPhoneReboot: Boolean = false,
+    val blockPhoneReboot: Boolean = false, // Blocks Power Menu
     val blockRecentAppsScreen: Boolean = false,
     val blockUnsupportedBrowsers: Boolean = false,
     val blockNewInstalledApps: Boolean = false,
-    val blockNotificationPanel: Boolean = false,
-    val blockedScreenCountdown: Boolean = false,
-    val isRemotelyLocked: Boolean = false // রিমোট লকের জন্য নতুন স্ট্যাটাস
+    
+    // Pomodoro & Focus
+    val isFocusActive: Boolean = false,
+    val focusTimeLeft: String = "00:00",
+    
+    // Live Chat & Admin Msg
+    val adminMessage: String = ""
 )
 
 class BlockerHeroViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("BlockerPrefs", Context.MODE_PRIVATE)
-    
-    // ডিভাইসের ইউনিক আইডি বের করা
     private val deviceId: String = Settings.Secure.getString(application.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown_device"
-
-    // ফায়ারবেস ডাটাবেসের রেফারেন্স (mobile_controls -> DeviceID)
     private val databaseRef = FirebaseDatabase.getInstance().getReference("mobile_controls").child(deviceId)
 
     private val _uiState = MutableStateFlow(
         BlockerHeroUiState(
-            blockYoutubeShorts = prefs.getBoolean("blockYoutubeShorts", false),
-            blockAdultContent = prefs.getBoolean("blockAdultContent", false),
-            isRemotelyLocked = prefs.getBoolean("isRemotelyLocked", false)
+            isRemotelyLocked = prefs.getBoolean("isRemotelyLocked", false),
+            blockAdultContent = prefs.getBoolean("blockAdult", false),
+            blockYoutubeShorts = prefs.getBoolean("blockShorts", false),
+            blockFacebookReels = prefs.getBoolean("blockReels", false),
+            uninstallProtection = prefs.getBoolean("uninstallProtection", false),
+            blockPhoneReboot = prefs.getBoolean("blockPhoneReboot", false),
+            blockRecentAppsScreen = prefs.getBoolean("blockRecentAppsScreen", false),
+            blockUnsupportedBrowsers = prefs.getBoolean("blockUnsupportedBrowsers", false),
+            blockNewInstalledApps = prefs.getBoolean("blockNewInstalledApps", false)
         )
     )
     val uiState: StateFlow<BlockerHeroUiState> = _uiState.asStateFlow()
 
     init {
-        // প্রথমবার অ্যাপ ওপেন হলে ফায়ারবেসে ডিভাইসের তথ্য পাঠিয়ে দেওয়া
         initializeFirebaseData()
-        
-        // ফায়ারবেসের পরিবর্তনের দিকে নজর রাখা (Listener)
         listenToRemoteCommands()
     }
 
@@ -59,10 +68,15 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         val initialData = mapOf(
             "deviceName" to android.os.Build.MODEL,
             "isLocked" to _uiState.value.isRemotelyLocked,
+            "blockAdult" to _uiState.value.blockAdultContent,
             "blockShorts" to _uiState.value.blockYoutubeShorts,
-            "blockAdult" to _uiState.value.blockAdultContent
+            "blockReels" to _uiState.value.blockFacebookReels,
+            "uninstallProtection" to _uiState.value.uninstallProtection,
+            "blockPhoneReboot" to _uiState.value.blockPhoneReboot,
+            "blockRecentAppsScreen" to _uiState.value.blockRecentAppsScreen,
+            "blockUnsupportedBrowsers" to _uiState.value.blockUnsupportedBrowsers,
+            "blockNewInstalledApps" to _uiState.value.blockNewInstalledApps
         )
-        // ডাটাবেসে আপডেট করে দিচ্ছি
         databaseRef.updateChildren(initialData)
     }
 
@@ -71,55 +85,98 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val isLocked = snapshot.child("isLocked").getValue(Boolean::class.java) ?: false
-                    val blockShorts = snapshot.child("blockShorts").getValue(Boolean::class.java) ?: false
-                    val blockAdult = snapshot.child("blockAdult").getValue(Boolean::class.java) ?: false
+                    val bAdult = snapshot.child("blockAdult").getValue(Boolean::class.java) ?: false
+                    val bShorts = snapshot.child("blockShorts").getValue(Boolean::class.java) ?: false
+                    val bReels = snapshot.child("blockReels").getValue(Boolean::class.java) ?: false
+                    val uProtect = snapshot.child("uninstallProtection").getValue(Boolean::class.java) ?: false
+                    val bReboot = snapshot.child("blockPhoneReboot").getValue(Boolean::class.java) ?: false
+                    val bRecent = snapshot.child("blockRecentAppsScreen").getValue(Boolean::class.java) ?: false
+                    val bBrowser = snapshot.child("blockUnsupportedBrowsers").getValue(Boolean::class.java) ?: false
+                    val bNewApps = snapshot.child("blockNewInstalledApps").getValue(Boolean::class.java) ?: false
+                    val adminMsg = snapshot.child("adminMessage").getValue(String::class.java) ?: ""
 
-                    // ফায়ারবেস থেকে ডাটা আসলে মেমোরিতে সেভ করা
+                    // Save to SharedPreferences for Accessibility Service
                     prefs.edit().apply {
                         putBoolean("isRemotelyLocked", isLocked)
-                        putBoolean("blockYoutubeShorts", blockShorts)
-                        putBoolean("blockAdultContent", blockAdult)
+                        putBoolean("blockAdult", bAdult)
+                        putBoolean("blockShorts", bShorts)
+                        putBoolean("blockReels", bReels)
+                        putBoolean("uninstallProtection", uProtect)
+                        putBoolean("blockPhoneReboot", bReboot)
+                        putBoolean("blockRecentAppsScreen", bRecent)
+                        putBoolean("blockUnsupportedBrowsers", bBrowser)
+                        putBoolean("blockNewInstalledApps", bNewApps)
                         apply()
                     }
 
-                    // UI স্ট্যাটাস আপডেট করা
-                    _uiState.update { currentState ->
-                        currentState.copy(
+                    // Update UI
+                    _uiState.update { 
+                        it.copy(
                             isRemotelyLocked = isLocked,
-                            blockYoutubeShorts = blockShorts,
-                            blockAdultContent = blockAdult
+                            blockAdultContent = bAdult,
+                            blockYoutubeShorts = bShorts,
+                            blockFacebookReels = bReels,
+                            uninstallProtection = uProtect,
+                            blockPhoneReboot = bReboot,
+                            blockRecentAppsScreen = bRecent,
+                            blockUnsupportedBrowsers = bBrowser,
+                            blockNewInstalledApps = bNewApps,
+                            adminMessage = adminMsg
                         )
                     }
-                    Log.d("FirebaseSync", "Data updated from remote: Locked=$isLocked, Shorts=$blockShorts")
                 }
             }
-
             override fun onCancelled(error: DatabaseError) {
-                Log.e("FirebaseSync", "Failed to read value.", error.toException())
+                Log.e("ViewModel", "Firebase Error", error.toException())
             }
         })
     }
 
-    // অ্যাপ থেকে ম্যানুয়ালি চেঞ্জ করলে মেমোরি এবং ফায়ারবেস দুটোই আপডেট হবে
-    fun updateYoutubeShorts(checked: Boolean) {
-        prefs.edit().putBoolean("blockYoutubeShorts", checked).apply()
+    // Toggle Functions from App UI
+    fun toggleYoutubeShorts(checked: Boolean) {
+        prefs.edit().putBoolean("blockShorts", checked).apply()
         _uiState.update { it.copy(blockYoutubeShorts = checked) }
         databaseRef.child("blockShorts").setValue(checked)
     }
 
-    fun updateAdultContent(checked: Boolean) {
-        prefs.edit().putBoolean("blockAdultContent", checked).apply()
-        _uiState.update { it.copy(blockAdultContent = checked) }
-        databaseRef.child("blockAdult").setValue(checked)
+    fun toggleFacebookReels(checked: Boolean) {
+        prefs.edit().putBoolean("blockReels", checked).apply()
+        _uiState.update { it.copy(blockFacebookReels = checked) }
+        databaseRef.child("blockReels").setValue(checked)
     }
 
-    // বাকি ফাংশনগুলো
-    fun updateImageSearch(checked: Boolean) { _uiState.update { it.copy(blockImageSearch = checked) } }
-    fun updateUninstallProtection(checked: Boolean) { _uiState.update { it.copy(uninstallProtection = checked) } }
-    fun updatePhoneReboot(checked: Boolean) { _uiState.update { it.copy(blockPhoneReboot = checked) } }
-    fun updateRecentApps(checked: Boolean) { _uiState.update { it.copy(blockRecentAppsScreen = checked) } }
-    fun updateUnsupportedBrowsers(checked: Boolean) { _uiState.update { it.copy(blockUnsupportedBrowsers = checked) } }
-    fun updateNewInstalledApps(checked: Boolean) { _uiState.update { it.copy(blockNewInstalledApps = checked) } }
-    fun updateNotificationPanel(checked: Boolean) { _uiState.update { it.copy(blockNotificationPanel = checked) } }
-    fun updateScreenCountdown(checked: Boolean) { _uiState.update { it.copy(blockedScreenCountdown = checked) } }
+    fun toggleUninstallProtection(checked: Boolean) {
+        prefs.edit().putBoolean("uninstallProtection", checked).apply()
+        _uiState.update { it.copy(uninstallProtection = checked) }
+        databaseRef.child("uninstallProtection").setValue(checked)
+    }
+
+    fun togglePhoneReboot(checked: Boolean) {
+        prefs.edit().putBoolean("blockPhoneReboot", checked).apply()
+        _uiState.update { it.copy(blockPhoneReboot = checked) }
+        databaseRef.child("blockPhoneReboot").setValue(checked)
+    }
+
+    fun toggleRecentAppsScreen(checked: Boolean) {
+        prefs.edit().putBoolean("blockRecentAppsScreen", checked).apply()
+        _uiState.update { it.copy(blockRecentAppsScreen = checked) }
+        databaseRef.child("blockRecentAppsScreen").setValue(checked)
+    }
+
+    fun toggleUnsupportedBrowsers(checked: Boolean) {
+        prefs.edit().putBoolean("blockUnsupportedBrowsers", checked).apply()
+        _uiState.update { it.copy(blockUnsupportedBrowsers = checked) }
+        databaseRef.child("blockUnsupportedBrowsers").setValue(checked)
+    }
+
+    fun toggleNewInstalledApps(checked: Boolean) {
+        prefs.edit().putBoolean("blockNewInstalledApps", checked).apply()
+        _uiState.update { it.copy(blockNewInstalledApps = checked) }
+        databaseRef.child("blockNewInstalledApps").setValue(checked)
+    }
+
+    // Chat System
+    fun sendLiveChatMessage(message: String) {
+        databaseRef.child("liveChatUser").setValue(message)
+    }
 }
