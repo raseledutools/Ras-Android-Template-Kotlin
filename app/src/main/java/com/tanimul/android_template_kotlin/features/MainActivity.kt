@@ -8,19 +8,18 @@ import android.text.TextUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,7 +27,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.tanimul.android_template_kotlin.R
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -91,20 +89,36 @@ fun AppNavigation(viewModel: BlockerHeroViewModel) {
     }
 }
 
+// ছবি ছাড়াই কোড দিয়ে তৈরি সুন্দর স্প্ল্যাশ স্ক্রিন
 @Composable
 fun SplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White),
+            .background(Color(0xFF15AABF)), // Rasfocus এর প্রাইমারি কালার
         contentAlignment = Alignment.Center
     ) {
-        // আপনার drawable ফোল্ডারে থাকা splash.png এখানে দেখাবে
-        Image(
-            painter = painterResource(id = R.drawable.splash), 
-            contentDescription = "Splash Screen",
-            modifier = Modifier.size(150.dp)
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.Visibility, // চোখের আইকন
+                contentDescription = "Splash Logo",
+                tint = Color.White,
+                modifier = Modifier.size(100.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Rasfocus Pro",
+                color = Color.White,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Stay Focused. Stay Ahead.",
+                color = Color.White.copy(alpha = 0.8f),
+                fontSize = 16.sp
+            )
+        }
     }
 }
 
