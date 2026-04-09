@@ -1,5 +1,6 @@
 package com.tanimul.android_template_kotlin.features
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -20,11 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner // <-- এই লাইনটাই চেঞ্জ করা হয়েছে
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.delay
@@ -61,15 +64,28 @@ fun isAccessibilityServiceEnabled(context: Context, service: Class<out android.a
 fun AppNavigation(viewModel: BlockerHeroViewModel) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val view = LocalView.current
 
     var showSplash by remember { mutableStateOf(true) }
     var hasPermission by remember { mutableStateOf(isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)) }
 
-    // অ্যাপ ব্যাকগ্রাউন্ড থেকে সামনে আসলে পারমিশন আবার চেক করবে
+    // টপ বার এবং নেভিগেশন বারের প্রিমিয়াম ডিজাইন
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as Activity).window
+            window.statusBarColor = android.graphics.Color.parseColor("#15AABF") // Rasfocus Teal Theme
+            window.navigationBarColor = android.graphics.Color.parseColor("#FFFFFF") // Clean White Bottom
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
+        }
+    }
+
+    // অ্যাপ ব্যাকগ্রাউন্ড থেকে সামনে আসলে পারমিশন চেক করা
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 hasPermission = isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)
+                // (নোট: অ্যাপে রিস্টার্ট বা মিনিমাইজ থেকে আসলে পুনরায় পাসওয়ার্ড চাওয়ার লজিকটা আমরা ViewModel-এ হ্যান্ডেল করব)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -89,18 +105,17 @@ fun AppNavigation(viewModel: BlockerHeroViewModel) {
     }
 }
 
-// ছবি ছাড়াই কোড দিয়ে তৈরি সুন্দর স্প্ল্যাশ স্ক্রিন
 @Composable
 fun SplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF15AABF)), // Rasfocus এর প্রাইমারি কালার
+            .background(Color(0xFF15AABF)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
-                imageVector = Icons.Default.Visibility, // চোখের আইকন
+                imageVector = Icons.Default.Visibility,
                 contentDescription = "Splash Logo",
                 tint = Color.White,
                 modifier = Modifier.size(100.dp)
@@ -168,7 +183,6 @@ fun PermissionScreen() {
             
             Button(
                 onClick = {
-                    // সেটিংসে অ্যাক্সেসিবিলিটি পেজ ওপেন করবে
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     context.startActivity(intent)
                 },
