@@ -1,206 +1,186 @@
-package com.tanimul.android_template_kotlin.features
-
 import android.accessibilityservice.AccessibilityService
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import kotlinx.coroutines.*
 
 class BlockerAccessibilityService : AccessibilityService() {
 
-    // এক্সপ্লিসিট কি-ওয়ার্ড লিস্ট
-    private val explicitKeywords = listOf(
-        "porn", "xxx", "sex", "nude", "nsfw", "xvideos", "pornhub", 
-        "xnxx", "xhamster", "brazzers", "onlyfans", "playboy", 
-        "mia khalifa", "bhabi", "chudai", "bangla choti", "magi"
+    private val serviceScope = CoroutineScope(Dispatchers.IO + Job())
+
+    // ================= ডাটাবেস লিস্ট (আপাতত ডামি, পরে Room DB থেকে আসবে) =================
+    
+    // ১. হার্ডকোর, মিডিয়াম এবং বাংলা অ্যাডাল্ট কি-ওয়ার্ড
+    private val allBadWords = listOf(
+        "pornhub", "xvideos", "xnxx", "redtube", "brazzers", "xhamster", 
+        "chaturbate", "spankbang", "eporner", "youporn", "tube8", "hqporner",
+        "porn", "sex", "xxx", "nude", "naked", "adult video", "18+", 
+        "choti", "mia khalifa", "johnny sins",
+        "hot video", "hot scene", "desi", "boudi", "bhabhi", "devar", 
+        "item song", "item dance", "mujra", "belly dance", "bikini", 
+        "romance", "kissing", "ullu", "web series", "ullongo", 
+        "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
+        // বাংলা কি-ওয়ার্ড
+        "চটি", "চটি গল্প", "সেক্স", "পর্ণ", "পর্ন", "খারাপ ভিডিও", 
+        "নগ্ন", "বৌদি", "উলঙ্গ", "হট ভিডিও", "হট সিন", "রোমান্স", 
+        "চুমু", "নীল ছবি", "এডাল্ট", "খারাপ ছবি", "নোংরা ভিডিও", 
+        "কাপড় ছাড়া", "খুল্লাম খুল্লা", "বাসর রাত", "গোপন ভিডিও"
     )
 
-    // সিস্টেম এবং ইমার্জেন্সি অ্যাপ যেগুলো সব সময় চলবে
-    private val systemAllowedPackages = listOf(
-        "com.tanimul.android_template_kotlin",
-        "com.ras.Rasfocus", 
-        "com.android.dialer",
-        "com.android.server.telecom",
-        "com.android.messaging",
-        "com.google.android.dialer",
-        "com.android.systemui",
-        "com.android.launcher",
-        "com.google.android.apps.nexuslauncher"
+    // ২. ব্লক করা অ্যাপের প্যাকেজ নেম (উদাহরণস্বরূপ ফেসবুক এবং টিকটক)
+    private val blockedApps = listOf("com.facebook.katana", "com.zhiliaoapp.musically")
+
+    // ৩. ব্লক করা ওয়েবসাইটের লিস্ট
+    private val blockedSites = listOf("facebook.com", "tiktok.com", "instagram.com")
+
+    // ৪. হাদিস ও সতর্কবার্তা
+    private val hadiths = listOf(
+        "হাদিস: অশ্লীলতা ইসলামের অংশ নয়।",
+        "হাদিস: লজ্জা ঈমানের একটি বিশেষ অঙ্গ।",
+        "বার্তা: আল্লাহ তোমার সব কাজ দেখছেন। পড়াশোনায় মন দাও।",
+        "হাদিস: প্রকৃত মুসলিম সে-ই, যার ভাষা ও হাত থেকে অন্যরা নিরাপদ।",
+        "বার্তা: জীবন খুব ছোট, এই অমূল্য সময় নষ্ট কোরো না।"
     )
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null) return
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        // সার্ভিস চালু হওয়ার সাথে সাথেই Usage Stats-এর পাহারাদার ব্যাকগ্রাউন্ডে চালু হয়ে যাবে
+        startUsageStatsMonitor()
+    }
 
-        val prefs = applicationContext.getSharedPreferences("BlockerPrefs", Context.MODE_PRIVATE)
-        
-        // ফায়ারবেস এবং অ্যাপ থেকে আসা কমান্ডগুলো পড়া
-        val isRemotelyLocked = prefs.getBoolean("isRemotelyLocked", false)
-        val isStrictBreakActive = prefs.getBoolean("isStrictBreakActive", false)
-        val listMode = prefs.getString("list_mode", "BLOCK") ?: "BLOCK"
-        val blockList = prefs.getStringSet("block_list", emptySet())?.toList() ?: emptyList()
-        val allowList = prefs.getStringSet("allow_list", emptySet())?.toList() ?: emptyList()
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        val packageName = event.packageName?.toString() ?: return
+        val rootNode = rootInActiveWindow
 
-        val blockAdult = prefs.getBoolean("blockAdult", false)
-        val blockShorts = prefs.getBoolean("blockShorts", false)
-        val blockReels = prefs.getBoolean("blockReels", false)
-        val uninstallProtection = prefs.getBoolean("uninstallProtection", false)
-        val blockRecentAppsScreen = prefs.getBoolean("blockRecentAppsScreen", false)
-        val blockPhoneReboot = prefs.getBoolean("blockPhoneReboot", false)
-        val blockNewInstalledApps = prefs.getBoolean("blockNewInstalledApps", false)
-
-        val packageName = event.packageName?.toString() ?: ""
-        val className = event.className?.toString() ?: ""
-        
-        // ১. ক্লিক করা টেক্সট ট্র্যাক করা
-        var clickedText = ""
-        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            clickedText = (event.text?.joinToString(" ") ?: "") + " " + (event.contentDescription ?: "")
-            clickedText = clickedText.lowercase()
+        // ================= ১. ইনস্ট্যান্ট অ্যাপ ব্লকিং (সবচেয়ে ফাস্ট) =================
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            if (blockedApps.contains(packageName)) {
+                triggerInstantBlock("এই অ্যাপটি আপনার ফোকাস লিস্টে ব্লক করা আছে!")
+                return
+            }
         }
 
-        // ২. টাইপ করা টেক্সট ট্র্যাক করা (হোয়াটসঅ্যাপ/টেলিগ্রাম/ক্রোমের সার্চ বারে টাইপিং ধরার জন্য)
-        var typedText = ""
+        // ================= ২. কি-ওয়ার্ড ব্লকিং (যেকোনো জায়গায় টাইপ করলে) =================
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
-            typedText = event.text?.joinToString(" ")?.lowercase() ?: ""
+            val typedText = event.text.toString().lowercase()
+            if (typedText.isNotEmpty()) {
+                for (word in allBadWords) {
+                    if (typedText.contains(word)) {
+                        triggerInstantBlock("খারাপ শব্দ টাইপ করা নিষেধ!")
+                        return
+                    }
+                }
+            }
         }
 
-        // ৩. স্ক্রিনের সব টেক্সট একসাথে করা
-        val screenText = mutableListOf<String>()
-        event.text?.forEach { screenText.add(it.toString().lowercase()) }
-        val nodeText = getEventText(event.source).lowercase()
-        val fullTextContext = screenText.joinToString(" ") + " " + nodeText + " " + typedText
+        // ================= ৩. ওয়েবসাইট ব্লকিং (ব্রাউজারের URL বার স্ক্যান) =================
+        if (rootNode != null && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            // ক্রোম বা অন্য ব্রাউজারের URL বার খোঁজা
+            val urlNodes = rootNode.findAccessibilityNodeInfosByViewId("com.android.chrome:id/url_bar")
+            if (urlNodes.isNotEmpty()) {
+                val urlText = urlNodes[0].text?.toString()?.lowercase() ?: ""
+                for (site in blockedSites) {
+                    if (urlText.contains(site)) {
+                        triggerInstantBlock("এই ওয়েবসাইটটি আপনার ফোকাস লিস্টে ব্লক করা আছে!")
+                        urlNodes[0].recycle()
+                        return
+                    }
+                }
+                urlNodes[0].recycle()
+            }
+        }
 
-        // ==========================================
-        // 🚨 STRICT BREAK MODE (Whitelist Only)
-        // ==========================================
-        if (isStrictBreakActive) {
-            val isSystemApp = systemAllowedPackages.any { packageName.contains(it) }
-            val isUserAllowedApp = allowList.any { packageName.contains(it) || fullTextContext.contains(it) }
+        // ================= ৪. ইউটিউব শর্টস এবং ফেসবুক রিলস ব্লকিং =================
+        if (rootNode != null && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             
-            if (!isSystemApp && !isUserAllowedApp) {
-                performGlobalAction(GLOBAL_ACTION_HOME) // মিনিমাইজ করবে
-                showAppMainScreen() // আমাদের মেইন অ্যাপের টাইমার স্ক্রিন সামনে আনবে
-                return
-            }
-        }
-
-        // ==========================================
-        // 🚨 MASTER LOCK (Firebase Control)
-        // ==========================================
-        if (isRemotelyLocked && !isStrictBreakActive) {
-            if (packageName.isNotEmpty() && !systemAllowedPackages.contains(packageName)) {
-                performGlobalAction(GLOBAL_ACTION_HOME)
-                showBlockScreen("LOCKED")
-                return
-            }
-        }
-
-        // ==========================================
-        // 📜 REGULAR BLOCK / ALLOW LIST CHECK
-        // ==========================================
-        if (!isStrictBreakActive && !isRemotelyLocked) {
-            if (listMode == "BLOCK" && blockList.isNotEmpty()) {
-                val shouldBlock = blockList.any { packageName.contains(it) || fullTextContext.contains(it) }
-                if (shouldBlock && !systemAllowedPackages.contains(packageName)) {
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    showBlockScreen("LOCKED")
-                    return
-                }
-            } else if (listMode == "ALLOW" && allowList.isNotEmpty()) {
-                val isSystemApp = systemAllowedPackages.any { packageName.contains(it) }
-                val isUserAllowedApp = allowList.any { packageName.contains(it) || fullTextContext.contains(it) }
-                if (!isSystemApp && !isUserAllowedApp) {
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    showBlockScreen("LOCKED")
-                    return
+            // ইউটিউব শর্টস লজিক
+            if (packageName == "com.google.android.youtube") {
+                val shortsNodes = rootNode.findAccessibilityNodeInfosByText("Shorts")
+                if (shortsNodes.isNotEmpty()) {
+                    for (node in shortsNodes) {
+                        if (node.contentDescription?.toString()?.contains("Shorts", ignoreCase = true) == true || 
+                            node.text?.toString()?.equals("Shorts", ignoreCase = true) == true) {
+                            
+                            performGlobalAction(GLOBAL_ACTION_BACK) 
+                            node.recycle()
+                            return
+                        }
+                        node.recycle()
+                    }
                 }
             }
-        }
 
-        // ==========================================
-        // 🔞 ADULT CONTENT BLOCK (Typing & Screen Check)
-        // ==========================================
-        if (blockAdult && fullTextContext.isNotBlank()) {
-            val regexPattern = "\\b(${explicitKeywords.joinToString("|")})\\b".toRegex(RegexOption.IGNORE_CASE)
-            if (regexPattern.containsMatchIn(fullTextContext)) {
-                performGlobalAction(GLOBAL_ACTION_HOME)
-                showBlockScreen("ADULT")
-                return
-            }
-        }
+            // ফেসবুক রিলস লজিক
+            if (packageName == "com.facebook.katana") {
+                val reelsNodes = rootNode.findAccessibilityNodeInfosByText("Reels")
+                val reelNodes = rootNode.findAccessibilityNodeInfosByText("Reel")
+                val allReelsNodes = reelsNodes + reelNodes
 
-        // ==========================================
-        // 🎥 YOUTUBE SHORTS & FACEBOOK REELS BLOCK
-        // ==========================================
-        if (blockShorts && packageName.contains("youtube")) {
-            if (clickedText.contains("shorts") || clickedText.contains("শর্টস") || 
-                fullTextContext.contains("like this short") || fullTextContext.contains("dislike this short")) {
-                performGlobalAction(GLOBAL_ACTION_BACK)
-                return
-            }
-        }
-
-        if (blockReels && packageName.contains("facebook")) {
-            if (clickedText.contains("reels") || clickedText.contains("রিলস") || clickedText.contains("reel") || 
-                fullTextContext.contains("reels audio") || fullTextContext.contains("swipe up to show more reels")) {
-                performGlobalAction(GLOBAL_ACTION_BACK)
-                return
-            }
-        }
-
-        // ==========================================
-        // 🛡️ STRICT SECURITY (Uninstall, Reboot, etc.)
-        // ==========================================
-        if (uninstallProtection) {
-            if (packageName == "com.android.settings" || packageName == "com.google.android.packageinstaller") {
-                if ((fullTextContext.contains("uninstall") || fullTextContext.contains("delete") || fullTextContext.contains("remove")) && 
-                    (fullTextContext.contains("rasfocus") || fullTextContext.contains("blockerhero") || fullTextContext.contains("android_template"))) {
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                    showBlockScreen("SECURITY")
-                    return
+                if (allReelsNodes.isNotEmpty()) {
+                    for (node in allReelsNodes) {
+                        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+                        val text = node.text?.toString()?.lowercase() ?: ""
+                        
+                        if (desc.contains("reels") || text == "reels" || text == "reel") {
+                            performGlobalAction(GLOBAL_ACTION_BACK)
+                            node.recycle()
+                            return
+                        }
+                        node.recycle()
+                    }
                 }
             }
-        }
-
-        if (blockRecentAppsScreen && packageName == "com.android.systemui" && className.contains("Recents")) {
-            performGlobalAction(GLOBAL_ACTION_HOME)
-            return
-        }
-
-        if (blockPhoneReboot && (fullTextContext.contains("power off") || fullTextContext.contains("restart") || className.contains("GlobalActionsDialog"))) {
-            performGlobalAction(GLOBAL_ACTION_BACK)
-            performGlobalAction(GLOBAL_ACTION_HOME)
-            return
-        }
-
-        if (blockNewInstalledApps && packageName == "com.android.vending" && fullTextContext.contains("install")) {
-            performGlobalAction(GLOBAL_ACTION_HOME)
-            showBlockScreen("NEW_APP")
-            return
+            rootNode.recycle()
         }
     }
 
-    private fun getEventText(node: AccessibilityNodeInfo?): String {
-        if (node == null) return ""
-        var text = (node.text?.toString() ?: "") + " " + (node.contentDescription?.toString() ?: "")
-        for (i in 0 until node.childCount) {
-            text += " " + getEventText(node.getChild(i))
+    // ================= ৫. Usage Stats মনিটর (The Hybrid Smart Logic) =================
+    // যদি কোনো অ্যাপ Accessibility-কে ফাঁকি দিয়ে ওপেন হয়েও যায়, এই লজিক তাকে ধরে ফেলবে
+    private fun startUsageStatsMonitor() {
+        serviceScope.launch {
+            val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+            while (isActive) {
+                val endTime = System.currentTimeMillis()
+                val startTime = endTime - 2000 // গত ২ সেকেন্ডের ডাটা চেক করবে
+
+                val stats = usageStatsManager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, startTime, endTime)
+                
+                if (stats != null) {
+                    for (usageStats in stats) {
+                        // যদি অ্যাপটি বর্তমানে ফোরগ্রাউন্ডে থাকে এবং আমাদের ব্লকলিস্টে থাকে
+                        if (usageStats.lastTimeUsed > startTime && blockedApps.contains(usageStats.packageName)) {
+                            
+                            // মেইন থ্রেডে ব্লক স্ক্রিন কল করতে হবে
+                            withContext(Dispatchers.Main) {
+                                triggerInstantBlock("Usage Access: ব্লক করা অ্যাপ চালানোর চেষ্টা করা হয়েছে!")
+                            }
+                        }
+                    }
+                }
+                delay(1500) // প্রতি ১.৫ সেকেন্ড পর পর চেক করবে (ব্যাটারি অপ্টিমাইজড)
+            }
         }
-        return text
     }
 
-    private fun showBlockScreen(reason: String) {
-        val intent = Intent(this, BlockActivity::class.java)
-        intent.putExtra("BLOCK_REASON", reason)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+    // অ্যাপ ক্লোজ করে একদম ইনস্ট্যান্ট হাদিস স্ক্রিনে পাঠানোর ফাংশন
+    private fun triggerInstantBlock(reason: String) {
+        performGlobalAction(GLOBAL_ACTION_HOME)
+
+        val randomHadith = hadiths.random()
+
+        val intent = Intent(this, BlockActivity::class.java).apply {
+            putExtra("HADITH_TEXT", randomHadith)
+            putExtra("BLOCK_REASON", reason)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK or Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
+        }
         startActivity(intent)
     }
 
-    // Strict Break এ অন্য অ্যাপ থেকে আমাদের মেইন অ্যাপে ফেরত আনার জন্য
-    private fun showAppMainScreen() {
-        val intent = Intent(this, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        startActivity(intent)
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel() // সার্ভিস বন্ধ হলে ব্যাকগ্রাউন্ড চেকিং বন্ধ হবে
     }
 
     override fun onInterrupt() {}
