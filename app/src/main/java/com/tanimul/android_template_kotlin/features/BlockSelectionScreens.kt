@@ -1,6 +1,6 @@
 package com.tanimul.android_template_kotlin.features
 
-// ================= সব ইম্পোর্ট একসাথে (ফাইলের শুরুতে) =================
+// সব ইম্পোর্ট একসাথে উপরে
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,26 +18,23 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import kotlinx.coroutines.delay
 
-// ================= কালার প্যালেট (ইউনিক এবং প্রিমিয়াম থিম) =================
+// ================= কালার প্যালেট =================
 val PrimaryColor = Color(0xFF1E3A8A) // রয়্যাল ব্লু
 val SecondaryColor = Color(0xFFE0F2FE) // হালকা ব্লু
 val TextColorDark = Color(0xFF111827)
 val TextColorLight = Color(0xFF6B7280)
 
-// ================= ৪. হোম স্ক্রিন ডিজাইন (মূল ড্যাশবোর্ড) =================
+// ================= হোম স্ক্রিন (মূল ড্যাশবোর্ড) =================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController) {
-    // ViewModel থেকে লাইভ ডাটা পড়ার জন্য
+    // ডাটাবেস থেকে রিয়েল-টাইম ডাটা নেওয়ার জন্য
     val uiState by viewModel.uiState.collectAsState()
 
-    // Scaffold ব্যবহার করা হয়েছে যাতে নিচে বটম নেভিগেশন বারটি সুন্দরভাবে সেট হয়
     Scaffold(
         bottomBar = { HomeBottomNavigationBar() },
         containerColor = Color(0xFFF3F6FA) // হালকা গ্রে-ব্লু ব্যাকগ্রাউন্ড
@@ -48,7 +45,7 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            // ১. হেডার সেকশন (৩ লাইনের ডিজাইন)
+            // ১. হেডার সেকশন
             HomeHeaderSection()
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -86,10 +83,10 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                // অ্যাকশন কার্ডগুলো (ডাটাবেস থেকে সাইজ দেখাবে)
+                // অ্যাকশন কার্ডগুলো (ডাটাবেসের রিয়েল ভ্যালু দেখাবে)
                 QuickActionClickableCard(
                     icon = Icons.Default.Block,
-                    title = uiState.blockList.size.toString(),
+                    title = uiState.blockList.size.toString(), // কতগুলো অ্যাপ ব্লক তার সংখ্যা
                     subtitle = "Apps Blocked",
                     onClick = { navController.navigate("app_whitelist") }
                 )
@@ -98,14 +95,14 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                 
                 QuickActionClickableCard(
                     icon = Icons.Default.Language,
-                    title = "Sites", // ওয়েবসাইটের কাউন্ট বা সাইট লেখা থাকবে
+                    title = "Sites", 
                     subtitle = "Sites Blocked",
                     onClick = { navController.navigate("site_whitelist") }
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // টগল কার্ডগুলো (যেগুলো অন/অফ করা যায়)
+                // টগল কার্ডগুলো (ViewModel এর সাথে কানেক্টেড)
                 QuickActionToggleCard(
                     icon = Icons.Default.Spellcheck,
                     title = "Keywords Blocked",
@@ -156,7 +153,6 @@ fun HomeHeaderSection() {
             .padding(top = 40.dp, bottom = 30.dp, start = 20.dp, end = 20.dp)
     ) {
         Column {
-            // টপ বার (মেনু এবং নোটিফিকেশন)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -179,19 +175,13 @@ fun HomeHeaderSection() {
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            // গ্রিটিং টেক্সট
             Text(text = "Welcome", color = SecondaryColor, fontSize = 16.sp)
-            Text(
-                text = "Good Evening", 
-                color = Color.White, 
-                fontSize = 28.sp, 
-                fontWeight = FontWeight.Bold
-            )
+            Text(text = "Good Evening", color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
-// ক্লিকেবল কার্ড (Apps Blocked, Sites Blocked এর জন্য)
+// ক্লিকেবল কার্ড
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickActionClickableCard(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
@@ -222,15 +212,9 @@ fun QuickActionClickableCard(icon: ImageVector, title: String, subtitle: String,
     }
 }
 
-// টগল কার্ড (Keywords, Adult Content এর জন্য)
+// টগল কার্ড
 @Composable
-fun QuickActionToggleCard(
-    icon: ImageVector, 
-    title: String, 
-    isToggled: Boolean, 
-    onToggle: (Boolean) -> Unit, 
-    onConfigure: () -> Unit
-) {
+fun QuickActionToggleCard(icon: ImageVector, title: String, isToggled: Boolean, onToggle: (Boolean) -> Unit, onConfigure: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -276,7 +260,7 @@ fun QuickActionToggleCard(
     }
 }
 
-// বটম নেভিগেশন (৪টি বাটন)
+// বটম নেভিগেশন
 @Composable
 fun HomeBottomNavigationBar() {
     var selectedItem by remember { mutableStateOf(0) }
@@ -304,13 +288,3 @@ fun HomeBottomNavigationBar() {
         }
     }
 }
-
-// ================= অন্যান্য অপ্রয়োজনীয় স্ক্রিন (ভবিষ্যতের জন্য রাখা হলো) =================
-@Composable
-fun DataHandlingScreenView(onAccept: () -> Unit) { /* MainActivity এখন এটা হ্যান্ডেল করে */ }
-@Composable
-fun UsagePermissionScreenView(onProceed: () -> Unit) { /* MainActivity এখন এটা হ্যান্ডেল করে */ }
-@Composable
-fun AccessibilityPermissionScreenView(onProceed: () -> Unit) { /* MainActivity এখন এটা হ্যান্ডেল করে */ }
-@Composable
-fun PermissionSetupLayout(title: String, description: String, icon: ImageVector, onProceed: () -> Unit, buttonText: String) {}
