@@ -1,4 +1,5 @@
 package com.tanimul.android_template_kotlin.features
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,7 +25,10 @@ import androidx.compose.ui.unit.sp
 enum class BreakFlowState { Config, Whitelist, ActiveTimer }
 
 @Composable
-fun TakeABreakMainScreen() {
+fun TakeABreakMainScreen(
+    viewModel: BlockerHeroViewModel, 
+    navController: androidx.navigation.NavController
+) {
     var currentScreen by remember { mutableStateOf(BreakFlowState.Config) }
 
     when (currentScreen) {
@@ -50,7 +54,7 @@ fun TakeABreakConfigScreen(onOpenWhitelist: () -> Unit, onStartBreak: () -> Unit
             .fillMaxSize()
             .background(Color(0xFFF3F6FA))
     ) {
-        // হেডার (গ্রাডিয়েন্ট ব্লু)
+        // হেডার (গ্রাডিয়েন্ট ব্লু)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -81,7 +85,7 @@ fun TakeABreakConfigScreen(onOpenWhitelist: () -> Unit, onStartBreak: () -> Unit
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(30.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("0 day       0 hr       0 min", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text("0 day        0 hr        0 min", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(10.dp))
                     Text("Select your break duration", color = Color.Gray, fontSize = 14.sp)
                 }
@@ -96,7 +100,7 @@ fun TakeABreakConfigScreen(onOpenWhitelist: () -> Unit, onStartBreak: () -> Unit
             
             Spacer(modifier = Modifier.height(16.dp))
 
-            // অ্যাপ হোয়াইটলিস্ট বাটন
+            // অ্যাপ হোয়াইটলিস্ট বাটন
             Card(
                 modifier = Modifier.fillMaxWidth().clickable { onOpenWhitelist() },
                 shape = RoundedCornerShape(16.dp),
@@ -155,7 +159,7 @@ fun ToggleCard(title: String, icon: androidx.compose.ui.graphics.vector.ImageVec
     }
 }
 
-// ================= ২. অ্যাপ হোয়াইটলিস্ট স্ক্রিন (Image 2) =================
+// ================= ২. অ্যাপ হোয়াইটলিস্ট স্ক্রিন (Image 2) =================
 @Composable
 fun AppWhitelistScreen(onSave: () -> Unit) {
     val dummyApps = listOf("BlockerHero", "AHA Games", "AI Gallery", "Calculator", "Calendar")
@@ -259,7 +263,7 @@ fun ActiveBreakScreen() {
 
             // এক্সটেন্ড বাটন
             Button(
-                onClick = { /* সময় বাড়ানোর লজিক */ },
+                onClick = { /* সময় বাড়ানোর লজিক */ },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.height(50.dp).width(200.dp)
