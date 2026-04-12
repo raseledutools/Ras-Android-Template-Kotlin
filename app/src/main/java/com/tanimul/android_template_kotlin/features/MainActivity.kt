@@ -1,9 +1,11 @@
 package com.tanimul.android_template_kotlin.features
 
 import android.app.Activity
+import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Process
 import android.provider.Settings
 import android.text.TextUtils
 import androidx.activity.ComponentActivity
@@ -30,6 +32,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -45,7 +50,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// অ্যাক্সেসিবিলিটি সার্ভিস চালু আছে কি না তা চেক করার ফাংশন
+// ================= পারমিশন চেকার ফাংশন =================
+
+// ১. অ্যাক্সেসিবিলিটি সার্ভিস চেক
 fun isAccessibilityServiceEnabled(context: Context, service: Class<out android.accessibilityservice.AccessibilityService>): Boolean {
     val enabledServices = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     if (enabledServices.isNullOrEmpty()) return false
@@ -60,6 +67,15 @@ fun isAccessibilityServiceEnabled(context: Context, service: Class<out android.a
     return false
 }
 
+// ২. Usage Access (দাপ্তরিক তথ্য) চেক
+fun isUsageStatsPermissionGranted(context: Context): Boolean {
+    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+    val mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
+    return mode == AppOpsManager.MODE_ALLOWED
+}
+
+// ================= মেইন নেভিগেশন কন্ট্রোলার =================
+
 @Composable
 fun AppNavigation(viewModel: BlockerHeroViewModel) {
     val context = LocalContext.current
@@ -67,9 +83,10 @@ fun AppNavigation(viewModel: BlockerHeroViewModel) {
     val view = LocalView.current
 
     var showSplash by remember { mutableStateOf(true) }
-    var hasPermission by remember { mutableStateOf(isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)) }
+    var hasAccPermission by remember { mutableStateOf(isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)) }
+    var hasUsagePermission by remember { mutableStateOf(isUsageStatsPermissionGranted(context)) }
 
-    // টপ বার এবং নেভিগেশন বারের প্রিমিয়াম ডিজাইন
+    // টপ বার এবং নেভিগেশন বারের প্রিমিয়াম ডিজাইন
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
@@ -80,12 +97,12 @@ fun AppNavigation(viewModel: BlockerHeroViewModel) {
         }
     }
 
-    // অ্যাপ ব্যাকগ্রাউন্ড থেকে সামনে আসলে পারমিশন চেক করা
+    // অ্যাপ ব্যাকগ্রাউন্ড থেকে সামনে আসলে পারমিশন রি-চেক করা
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                hasPermission = isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)
-                // (নোট: অ্যাপে রিস্টার্ট বা মিনিমাইজ থেকে আসলে পুনরায় পাসওয়ার্ড চাওয়ার লজিকটা আমরা ViewModel-এ হ্যান্ডেল করব)
+                hasAccPermission = isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)
+                hasUsagePermission = isUsageStatsPermissionGranted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -98,19 +115,60 @@ fun AppNavigation(viewModel: BlockerHeroViewModel) {
         showSplash = false
     }
 
+    // স্ক্রিন রাউটিং লজিক
     when {
         showSplash -> SplashScreen()
-        !hasPermission -> PermissionScreen()
-        else -> BlockerHeroApp(viewModel)
+        !hasAccPermission -> PermissionScreen(
+            title = "Accessibility Permission",
+            desc = "To block distractive apps and enforce focus mode, Rasfocus needs Accessibility permission.",
+            action = Settings.ACTION_ACCESSIBILITY_SETTINGS
+        )
+        !hasUsagePermission -> PermissionScreen(
+            title = "Usage Access Required",
+            desc = "To provide rock-solid blocking and prevent bypasses, we need Usage Access permission.",
+            action = Settings.ACTION_USAGE_ACCESS_SETTINGS
+        )
+        else -> BlockerHeroApp(viewModel) // সব পারমিশন থাকলে মেইন অ্যাপ ওপেন হবে
     }
 }
+
+// ================= অ্যাপের মূল রাস্তা (NavHost) =================
+@Composable
+fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
+    val navController = rememberNavController()
+
+    // NavHost হলো সেই রাস্তা, যার মাধ্যমে আমরা এক পেজ থেকে অন্য পেজে যাব
+    NavHost(navController = navController, startDestination = "home") {
+        
+        // ১. হোম স্ক্রিন (Dashboard)
+        composable("home") {
+            // আপনার HomeScreenView এর কোডে বাটন ক্লিকের জায়গায় navController.navigate("take_a_break") ইত্যাদি বসাতে হবে
+            HomeScreenView(viewModel = viewModel, navController = navController) 
+        }
+
+        // ২. Take a Break স্ক্রিন
+        composable("take_a_break") {
+            TakeABreakMainScreen(viewModel = viewModel, navController = navController)
+        }
+
+        // ৩. App Selection স্ক্রিন
+        composable("app_whitelist") {
+            AppSelectionScreen(viewModel = viewModel, onBackClick = { navController.popBackStack() })
+        }
+
+        // ৪. Site Selection স্ক্রিন
+        composable("site_whitelist") {
+            SiteSelectionScreen(viewModel = viewModel, onBackClick = { navController.popBackStack() })
+        }
+    }
+}
+
+// ================= স্প্ল্যাশ এবং পারমিশন স্ক্রিন =================
 
 @Composable
 fun SplashScreen() {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF15AABF)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFF15AABF)),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -121,76 +179,40 @@ fun SplashScreen() {
                 modifier = Modifier.size(100.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Rasfocus Pro",
-                color = Color.White,
-                fontSize = 36.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
+            Text(text = "RasFocus Pro", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Stay Focused. Stay Ahead.",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 16.sp
-            )
+            Text(text = "Stay Focused. Stay Ahead.", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
         }
     }
 }
 
 @Composable
-fun PermissionScreen() {
+fun PermissionScreen(title: String, desc: String, action: String) {
     val context = LocalContext.current
     val primaryColor = Color(0xFF15AABF)
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF8FAFC)
-    ) {
+    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFFF8FAFC)) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
+            modifier = Modifier.fillMaxSize().padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Security,
-                contentDescription = "Security",
-                tint = primaryColor,
-                modifier = Modifier.size(100.dp)
-            )
-            
+            Icon(imageVector = Icons.Default.Security, contentDescription = "Security", tint = primaryColor, modifier = Modifier.size(100.dp))
             Spacer(modifier = Modifier.height(32.dp))
-            
-            Text(
-                text = "Permission Required",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1E293B)
-            )
-            
+            Text(text = title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B), textAlign = TextAlign.Center)
             Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "To block distractive apps and enforce focus mode, Rasfocus needs Accessibility permission to monitor your screen.",
-                fontSize = 16.sp,
-                color = Color(0xFF64748B),
-                textAlign = TextAlign.Center,
-                lineHeight = 24.sp
-            )
-            
+            Text(text = desc, fontSize = 16.sp, color = Color(0xFF64748B), textAlign = TextAlign.Center, lineHeight = 24.sp)
             Spacer(modifier = Modifier.height(40.dp))
             
             Button(
                 onClick = {
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    val intent = Intent(action)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     context.startActivity(intent)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
                 shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(55.dp)
+                modifier = Modifier.fillMaxWidth().height(55.dp)
             ) {
                 Text("GRANT PERMISSION", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
