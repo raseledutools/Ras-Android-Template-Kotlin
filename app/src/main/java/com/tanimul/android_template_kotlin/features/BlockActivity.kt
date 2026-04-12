@@ -2,6 +2,7 @@ package com.tanimul.android_template_kotlin.features
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -27,12 +28,15 @@ class BlockActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // পাহারাদার (Service) থেকে কোন কারণে ব্লক হয়েছে, সেটা রিসিভ করা
-        val reason = intent.getStringExtra("BLOCK_REASON") ?: "LOCKED"
+        // পাহারাদার (Service) থেকে পাঠানো ডেটা রিসিভ করা
+        val reason = intent.getStringExtra("BLOCK_REASON") ?: "FOCUS MODE ACTIVE"
+        val hadithText = intent.getStringExtra("HADITH_TEXT") // সার্ভিস থেকে পাঠানো হাদিস
 
         setContent {
             MaterialTheme {
-                BlockScreen(reason)
+                // ব্যাক বাটন ব্লক করা (যাতে ইউজার ব্যাক করে পালাতে না পারে)
+                BackHandler(enabled = true) { }
+                BlockScreen(reason, hadithText)
             }
         }
     }
@@ -47,8 +51,8 @@ data class BlockState(
 )
 
 @Composable
-fun BlockScreen(reason: String) {
-    // আপনার পছন্দমতো ইসলামিক এবং টাইম কোটস (C++ লজিক অনুযায়ী)
+fun BlockScreen(reason: String, passedHadith: String?) {
+    // আপনার পছন্দমতো ইসলামিক এবং টাইম কোটস (C++ লজিক অনুযায়ী)
     val islamicQuotes = listOf(
         "\"মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে এবং তাদের যৌনাঙ্গর হেফাযত করে।\"\n- (সূরা আন-নূর: ৩০)",
         "\"লজ্জাশীলতা কল্যাণ ছাড়া আর কিছুই বয়ে আনে না।\"\n- (সহীহ বুখারী)",
@@ -57,38 +61,43 @@ fun BlockScreen(reason: String) {
     val timeQuotes = listOf(
         "\"যারা সময়কে মূল্যায়ন করে না, সময়ও তাদেরকে মূল্যায়ন করে না।\"\n- এ.পি.জে. আবদুল কালাম",
         "\"সফলতা কোনো ম্যাজিক নয়, এটি হলো ফোকাস এবং পরিশ্রমের ফল।\"",
-        "\"সময়ের সঠিক ব্যবহারই জীবনকে সুন্দর করে।\""
+        "\"সময়ের সঠিক ব্যবহারই জীবনকে সুন্দর করে।\""
     )
 
     // ব্লকের কারণ অনুযায়ী স্ক্রিনের রঙ, আইকন এবং কোটেশন পরিবর্তন
-    val state = when (reason) {
-        "ADULT" -> BlockState(
+    // আমরা চেক করছি রিজনটা কি অ্যাডাল্ট/খারাপ কি-ওয়ার্ড রিলেটেড নাকি নরমাল অ্যাপ ব্লক
+    val isAdultOrBadWord = reason.contains("খারাপ") || reason.contains("ADULT") || reason.contains("অশ্লীল")
+    val isSecurity = reason.contains("SECURITY")
+    val isNewApp = reason.contains("NEW_APP")
+
+    val state = when {
+        isAdultOrBadWord -> BlockState(
             icon = Icons.Default.Warning,
             title = "CONTENT RESTRICTED",
             color = Color(0xFFEF4444), // লাল (সতর্কবার্তা)
-            quote = islamicQuotes[Random.nextInt(islamicQuotes.size)]
+            quote = passedHadith ?: islamicQuotes[Random.nextInt(islamicQuotes.size)] // সার্ভিস থেকে হাদিস না এলে রেন্ডম
         )
-        "SECURITY" -> BlockState(
+        isSecurity -> BlockState(
             icon = Icons.Default.Security,
             title = "SECURITY PROTECTION",
             color = Color(0xFFF59E0B), // অরেঞ্জ
-            quote = "Uninstalling or bypassing protection is active for the selected duration."
+            quote = passedHadith ?: "Uninstalling or bypassing protection is active for the selected duration."
         )
-        "NEW_APP" -> BlockState(
+        isNewApp -> BlockState(
             icon = Icons.Default.Lock,
             title = "INSTALLATION BLOCKED",
             color = Color(0xFF3B82F6), // নীল
-            quote = "New app installation is currently restricted in Focus Mode."
+            quote = passedHadith ?: "New app installation is currently restricted in Focus Mode."
         )
         else -> BlockState(
             icon = Icons.Default.Lock,
             title = "FOCUS MODE ACTIVE",
             color = Color(0xFF15AABF), // Rasfocus থিম কালার
-            quote = timeQuotes[Random.nextInt(timeQuotes.size)]
+            quote = passedHadith ?: timeQuotes[Random.nextInt(timeQuotes.size)]
         )
     }
 
-    // হোয়াইট এবং ক্লিন প্রফেশনাল UI
+    // হোয়াইট এবং ক্লিন প্রফেশনাল UI
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color(0xFFF8FAFC)
@@ -124,9 +133,20 @@ fun BlockScreen(reason: String) {
                 textAlign = TextAlign.Center
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // সার্ভিস থেকে যে বাংলা মেসেজটা পাঠানো হয়েছে (যেমন: "খারাপ শব্দ টাইপ করা নিষেধ!")
+            Text(
+                text = reason,
+                color = state.color,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // উক্তি দেখানোর জন্য বর্ডার দেওয়া কার্ড
+            // উক্তি দেখানোর জন্য বর্ডার দেওয়া কার্ড
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = Color.White,
