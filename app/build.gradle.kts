@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.0" 
-    id("com.google.gms.google-services") version "4.4.1" // এখানেই সরাসরি ভার্সন যোগ করে দেওয়া হয়েছে
+    id("com.google.gms.google-services") version "4.4.1" 
 }
 
 android {
@@ -58,6 +58,9 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+
+    // Navigation Compose (এই লাইনটা নতুন যোগ করা হয়েছে আপনার MainActivity এর জন্য)
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // Compose BOM (Bill of Materials)
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
