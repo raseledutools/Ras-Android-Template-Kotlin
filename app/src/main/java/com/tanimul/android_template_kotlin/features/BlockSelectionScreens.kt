@@ -32,7 +32,7 @@ val TextColorLight = Color(0xFF6B7280)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController) {
-    // ডাটাবেস থেকে রিয়েল-টাইম ডাটা নেওয়ার জন্য
+    // ডাটাবেস থেকে রিয়েল-টাইম ডাটা নেওয়ার জন্য
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
@@ -62,7 +62,9 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFD8B4E2))
                 ) {
                     Row(
-                        modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                        modifier = Modifier
+                            .padding(20.dp)
+                            .fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(Icons.Default.Coffee, contentDescription = null, tint = Color.Black)
@@ -83,7 +85,7 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
-                // অ্যাকশন কার্ডগুলো (ডাটাবেসের রিয়েল ভ্যালু দেখাবে)
+                // অ্যাকশন কার্ডগুলো (ডাটাবেসের রিয়েল ভ্যালু দেখাবে)
                 QuickActionClickableCard(
                     icon = Icons.Default.Block,
                     title = uiState.blockList.size.toString(), // কতগুলো অ্যাপ ব্লক তার সংখ্যা
@@ -193,11 +195,15 @@ fun QuickActionClickableCard(icon: ImageVector, title: String, subtitle: String,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(45.dp).background(SecondaryColor, CircleShape),
+                modifier = Modifier
+                    .size(45.dp)
+                    .background(SecondaryColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = PrimaryColor)
@@ -222,11 +228,15 @@ fun QuickActionToggleCard(icon: ImageVector, title: String, isToggled: Boolean, 
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(45.dp).background(SecondaryColor, CircleShape),
+                modifier = Modifier
+                    .size(45.dp)
+                    .background(SecondaryColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = PrimaryColor)
