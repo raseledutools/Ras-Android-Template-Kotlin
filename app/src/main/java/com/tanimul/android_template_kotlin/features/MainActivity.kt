@@ -1,227 +1,277 @@
-package com.tanimul.android_template_kotlin.features
+// =====================================================================
+// রিয়েল এবং প্রফেশনাল স্ক্রিন (RasFocus Pro Max)
+// =====================================================================
 
-import android.app.Activity
-import android.app.AppOpsManager
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Bundle
-import android.os.Process
-import android.provider.Settings
-import android.text.TextUtils
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.view.WindowCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.delay
+import androidx.navigation.NavController
 
-class MainActivity : ComponentActivity() {
-    // এখানে ViewModel কানেক্ট করা হয়েছে
-    private val viewModel: BlockerHeroViewModel by viewModels()
+val RasFocusTeal = Color(0xFF15AABF)
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            MaterialTheme {
-                AppNavigation(viewModel)
-            }
-        }
-    }
-}
-
-// ================= পারমিশন চেকার ফাংশন =================
-
-// ১. অ্যাক্সেসিবিলিটি সার্ভিস চেক
-fun isAccessibilityServiceEnabled(context: Context, service: Class<out android.accessibilityservice.AccessibilityService>): Boolean {
-    val enabledServices = Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-    if (enabledServices.isNullOrEmpty()) return false
-    val colonSplitter = TextUtils.SimpleStringSplitter(':')
-    colonSplitter.setString(enabledServices)
-    while (colonSplitter.hasNext()) {
-        val componentName = colonSplitter.next()
-        if (componentName.equals("${context.packageName}/${service.name}", ignoreCase = true)) {
-            return true
-        }
-    }
-    return false
-}
-
-// ২. Usage Access (দাপ্তরিক তথ্য) চেক
-fun isUsageStatsPermissionGranted(context: Context): Boolean {
-    val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-    val mode = appOps.checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName)
-    return mode == AppOpsManager.MODE_ALLOWED
-}
-
-// ৩. Display Over Other Apps (Overlay) চেক
-fun isOverlayPermissionGranted(context: Context): Boolean {
-    return Settings.canDrawOverlays(context)
-}
-
-// ================= মেইন নেভিগেশন কন্ট্রোলার =================
-
+// ================= ১. হোম স্ক্রিন (Main Dashboard) =================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavigation(viewModel: BlockerHeroViewModel) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val view = LocalView.current
+fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController) {
+    val uiState by viewModel.uiState.collectAsState()
 
-    var showSplash by remember { mutableStateOf(true) }
-    var hasAccPermission by remember { mutableStateOf(isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)) }
-    var hasUsagePermission by remember { mutableStateOf(isUsageStatsPermissionGranted(context)) }
-    var hasOverlayPermission by remember { mutableStateOf(isOverlayPermissionGranted(context)) }
-
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.statusBarColor = android.graphics.Color.parseColor("#15AABF")
-            window.navigationBarColor = android.graphics.Color.parseColor("#FFFFFF")
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
-            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
-        }
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                hasAccPermission = isAccessibilityServiceEnabled(context, BlockerAccessibilityService::class.java)
-                hasUsagePermission = isUsageStatsPermissionGranted(context)
-                hasOverlayPermission = isOverlayPermissionGranted(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(Unit) {
-        delay(2000)
-        showSplash = false
-    }
-
-    when {
-        showSplash -> SplashScreen()
-        
-        !hasAccPermission -> PermissionScreen(
-            title = "Accessibility Permission",
-            desc = "To block distractive apps and enforce strict focus mode, Rasfocus needs Accessibility permission.",
-            actionIntent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
-            icon = Icons.Default.Security
-        )
-        
-        !hasUsagePermission -> PermissionScreen(
-            title = "Usage Access Required",
-            desc = "To provide rock-solid blocking and prevent bypasses, we need Usage Access permission.",
-            actionIntent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
-            icon = Icons.Default.Visibility
-        )
-
-        !hasOverlayPermission -> PermissionScreen(
-            title = "Display Over Apps",
-            desc = "Required to instantly show the Block Screen without any delay when a bad app is opened.",
-            actionIntent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")),
-            icon = Icons.Default.Layers
-        )
-        
-        else -> BlockerHeroApp(viewModel)
-    }
-}
-
-// ================= অ্যাপের মূল রাস্তা (NavHost) =================
-@Composable
-fun BlockerHeroApp(viewModel: BlockerHeroViewModel) {
-    val navController = rememberNavController()
-
-    NavHost(navController = navController, startDestination = "home") {
-        composable("home") {
-            HomeScreenView(viewModel = viewModel, navController = navController) 
-        }
-        composable("take_a_break") {
-            TakeABreakMainScreen(viewModel = viewModel, navController = navController)
-        }
-        composable("app_whitelist") {
-            AppSelectionScreen(viewModel = viewModel, onBackClick = { navController.popBackStack() })
-        }
-        composable("site_whitelist") {
-            SiteSelectionScreen(viewModel = viewModel, onBackClick = { navController.popBackStack() })
-        }
-    }
-}
-
-// ================= স্প্ল্যাশ এবং পারমিশন স্ক্রিন =================
-
-@Composable
-fun SplashScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF15AABF)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                imageVector = Icons.Default.Visibility,
-                contentDescription = "Splash Logo",
-                tint = Color.White,
-                modifier = Modifier.size(100.dp)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("RasFocus Pro Max", fontWeight = FontWeight.Bold, color = Color.White) },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = RasFocusTeal)
             )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "RasFocus Pro", color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = "Stay Focused. Stay Ahead.", color = Color.White.copy(alpha = 0.8f), fontSize = 16.sp)
+        },
+        containerColor = Color(0xFFF8FAFC)
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Active Status Card
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = if (uiState.uninstallProtection) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)),
+                    elevation = CardDefaults.cardElevation(4.dp)
+                ) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (uiState.uninstallProtection) Icons.Default.VerifiedUser else Icons.Default.GppBad,
+                            contentDescription = "Status",
+                            tint = if (uiState.uninstallProtection) Color(0xFF2E7D32) else Color(0xFFC62828),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Protection Status", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text(
+                                text = if (uiState.uninstallProtection) "Uninstall Protection ACTIVE" else "Vulnerable - Turn On Protection",
+                                color = if (uiState.uninstallProtection) Color(0xFF2E7D32) else Color(0xFFC62828),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Quick Actions
+            item { Text("Core Features", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 8.dp)) }
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ActionCard(icon = Icons.Rounded.Apps, title = "Block Apps", modifier = Modifier.weight(1f)) { navController.navigate("app_whitelist") }
+                    ActionCard(icon = Icons.Rounded.Language, title = "Block Sites", modifier = Modifier.weight(1f)) { navController.navigate("site_whitelist") }
+                    ActionCard(icon = Icons.Rounded.Timer, title = "Take a Break", modifier = Modifier.weight(1f)) { navController.navigate("take_a_break") }
+                }
+            }
+
+            // Toggles
+            item { Text("Strict Filters", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 16.dp)) }
+            item {
+                ToggleItem("Hardcore Adult Filter", "Instantly blocks explicit sites & typing", uiState.blockAdultContent) { viewModel.toggleAdultContent(it) }
+                ToggleItem("Facebook Reels Blocker", "Kills dopamine-scrolling on FB", uiState.blockFacebookReels) { viewModel.toggleFacebookReels(it) }
+                ToggleItem("YouTube Shorts Blocker", "Stops you from wasting hours on YT", uiState.blockYoutubeShorts) { viewModel.toggleYoutubeShorts(it) }
+            }
         }
     }
 }
 
 @Composable
-fun PermissionScreen(title: String, desc: String, actionIntent: Intent, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    val context = LocalContext.current
-    val primaryColor = Color(0xFF15AABF)
-
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFFF8FAFC)) {
+fun ActionCard(icon: ImageVector, title: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Card(
+        modifier = modifier.height(100.dp).clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(32.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(imageVector = icon, contentDescription = "Icon", tint = primaryColor, modifier = Modifier.size(100.dp))
-            Spacer(modifier = Modifier.height(32.dp))
-            Text(text = title, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B), textAlign = TextAlign.Center)
+            Icon(icon, contentDescription = title, tint = RasFocusTeal, modifier = Modifier.size(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF334155))
+        }
+    }
+}
+
+@Composable
+fun ToggleItem(title: String, desc: String, isChecked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1E293B))
+                Text(desc, fontSize = 12.sp, color = Color(0xFF64748B))
+            }
+            Switch(
+                checked = isChecked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = RasFocusTeal)
+            )
+        }
+    }
+}
+
+// ================= ২. Take a Break স্ক্রিন =================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TakeABreakMainScreen(viewModel: BlockerHeroViewModel, navController: NavController) {
+    val uiState by viewModel.uiState.collectAsState()
+    var hours by remember { mutableStateOf("0") }
+    var minutes by remember { mutableStateOf("25") }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Strict Break Mode") }, navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } }) }
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Rounded.Timer, contentDescription = "Timer", modifier = Modifier.size(80.dp), tint = RasFocusTeal)
             Spacer(modifier = Modifier.height(16.dp))
-            Text(text = desc, fontSize = 16.sp, color = Color(0xFF64748B), textAlign = TextAlign.Center, lineHeight = 24.sp)
-            Spacer(modifier = Modifier.height(40.dp))
             
+            if (uiState.isStrictBreakActive) {
+                Text("Focus Session Active!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFC62828))
+                Text(uiState.breakTimeRemaining, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF1E293B))
+                Text("Your phone is restricted until the timer runs out.", textAlign = TextAlign.Center, modifier = Modifier.padding(16.dp))
+            } else {
+                Text("Set Focus Duration", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OutlinedTextField(
+                        value = hours, onValueChange = { hours = it },
+                        label = { Text("Hours") }, modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = minutes, onValueChange = { minutes = it },
+                        label = { Text("Minutes") }, modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = { viewModel.startStrictBreak(hours.toIntOrNull() ?: 0, minutes.toIntOrNull() ?: 0) },
+                    modifier = Modifier.fillMaxWidth().height(55.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = RasFocusTeal)
+                ) {
+                    Text("START FOCUS MODE", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+// ================= ৩. App Selection স্ক্রিন =================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppSelectionScreen(viewModel: BlockerHeroViewModel, onBackClick: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsState()
+    var appPackage by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Block Apps") }, navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } }) }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            OutlinedTextField(
+                value = appPackage, onValueChange = { appPackage = it },
+                label = { Text("Enter App Package Name (e.g., com.whatsapp)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Button(
-                onClick = {
-                    actionIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(actionIntent)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth().height(55.dp)
-            ) {
-                Text("GRANT PERMISSION", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                onClick = { if(appPackage.isNotEmpty()) { viewModel.addToList(appPackage); appPackage = "" } },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = RasFocusTeal)
+            ) { Text("Add to Blocklist") }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Currently Blocked Apps:", fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            LazyColumn {
+                items(uiState.blockList.filter { it.contains(".") }) { item -> // Assuming package names have dots
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(item, fontWeight = FontWeight.Medium)
+                            IconButton(onClick = { viewModel.removeFromList("BLOCK", item) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.Red)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================= ৪. Site Selection স্ক্রিন =================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SiteSelectionScreen(viewModel: BlockerHeroViewModel, onBackClick: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsState()
+    var siteUrl by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Block Websites") }, navigationIcon = { IconButton(onClick = onBackClick) { Icon(Icons.Default.ArrowBack, contentDescription = "Back") } }) }
+    ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            OutlinedTextField(
+                value = siteUrl, onValueChange = { siteUrl = it },
+                label = { Text("Enter Website URL (e.g., facebook.com)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = { if(siteUrl.isNotEmpty()) { viewModel.addToList(siteUrl); siteUrl = "" } },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = RasFocusTeal)
+            ) { Text("Block Website") }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Currently Blocked Websites:", fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            LazyColumn {
+                items(uiState.blockList.filter { !it.contains("com.") || it.contains("www") }) { item -> 
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(item, fontWeight = FontWeight.Medium)
+                            IconButton(onClick = { viewModel.removeFromList("BLOCK", item) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.Red)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
