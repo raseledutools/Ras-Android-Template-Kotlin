@@ -34,8 +34,8 @@ data class BlockerHeroUiState(
     val allowList: List<String> = emptyList(),
     
     // UI Toggles (Dashboard)
-    val blockKeywords: Boolean = false, // নতুন যোগ করা হয়েছে হোমপেজের জন্য
-    val blockAdultContent: Boolean = false, 
+    val blockKeywords: Boolean = true, // ডিফল্ট true করে দেওয়া হয়েছে (ইনস্টল করলেই অন থাকবে)
+    val blockAdultContent: Boolean = true, // ১০০% গ্যারান্টির জন্য ডিফল্ট true
     val blockYoutubeShorts: Boolean = false,
     val blockFacebookReels: Boolean = false,
     
@@ -53,7 +53,7 @@ data class BlockerHeroUiState(
 
 class BlockerHeroViewModel(application: Application) : AndroidViewModel(application) {
 
-    // SharedPreferences দিয়ে ডেটা সেভ রাখা যাতে সার্ভিস সহজেই পড়তে পারে
+    // SharedPreferences
     private val prefs = application.getSharedPreferences("BlockerPrefs", Context.MODE_PRIVATE)
     private val deviceId: String = Settings.Secure.getString(application.contentResolver, Settings.Secure.ANDROID_ID) ?: "unknown_device"
     private val databaseRef = FirebaseDatabase.getInstance().getReference("mobile_controls").child(deviceId)
@@ -69,8 +69,10 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
             blockList = prefs.getStringSet("block_list", emptySet())?.toList() ?: emptyList(),
             allowList = prefs.getStringSet("allow_list", emptySet())?.toList() ?: emptyList(),
             
-            blockKeywords = prefs.getBoolean("blockKeywords", false), // নতুন
-            blockAdultContent = prefs.getBoolean("blockAdult", false),
+            // ইনস্টল করার সাথে সাথেই যেন কাজ করে তাই ডিফল্ট ট্রু (true) দেওয়া হলো
+            blockKeywords = prefs.getBoolean("blockKeywords", true), 
+            blockAdultContent = prefs.getBoolean("blockAdult", true),
+            
             blockYoutubeShorts = prefs.getBoolean("blockShorts", false),
             blockFacebookReels = prefs.getBoolean("blockReels", false),
             
@@ -108,8 +110,8 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val isLocked = snapshot.child("isLocked").getValue(Boolean::class.java) ?: false
-                    val bKeywords = snapshot.child("blockKeywords").getValue(Boolean::class.java) ?: false
-                    val bAdult = snapshot.child("blockAdult").getValue(Boolean::class.java) ?: false
+                    val bKeywords = snapshot.child("blockKeywords").getValue(Boolean::class.java) ?: true // ডিফল্ট true
+                    val bAdult = snapshot.child("blockAdult").getValue(Boolean::class.java) ?: true // ডিফল্ট true
                     val bShorts = snapshot.child("blockShorts").getValue(Boolean::class.java) ?: false
                     val bReels = snapshot.child("blockReels").getValue(Boolean::class.java) ?: false
                     val uProtect = snapshot.child("uninstallProtection").getValue(Boolean::class.java) ?: false
@@ -118,6 +120,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
                     val bNewApps = snapshot.child("blockNewInstalledApps").getValue(Boolean::class.java) ?: false
                     val adminMsg = snapshot.child("adminMessage").getValue(String::class.java) ?: ""
 
+                    // commit() ব্যবহার করা হয়েছে যাতে ডেটা সাথে সাথে সেভ হয় (Zero Delay এর জন্য)
                     prefs.edit().apply {
                         putBoolean("isRemotelyLocked", isLocked)
                         putBoolean("blockKeywords", bKeywords)
@@ -128,7 +131,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
                         putBoolean("blockPhoneReboot", bReboot)
                         putBoolean("blockRecentAppsScreen", bRecent)
                         putBoolean("blockNewInstalledApps", bNewApps)
-                        apply()
+                        commit() 
                     }
 
                     _uiState.update { 
@@ -156,7 +159,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         val totalMillis = TimeUnit.HOURS.toMillis(hours.toLong()) + TimeUnit.MINUTES.toMillis(minutes.toLong())
         val endTime = System.currentTimeMillis() + totalMillis
         
-        prefs.edit().putLong("strict_break_end_time", endTime).putBoolean("isStrictBreakActive", true).apply()
+        prefs.edit().putLong("strict_break_end_time", endTime).putBoolean("isStrictBreakActive", true).commit()
         startTimerCoroutine(endTime)
     }
 
@@ -187,13 +190,13 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun endStrictBreak() {
-        prefs.edit().putLong("strict_break_end_time", 0L).putBoolean("isStrictBreakActive", false).apply()
+        prefs.edit().putLong("strict_break_end_time", 0L).putBoolean("isStrictBreakActive", false).commit()
         _uiState.update { it.copy(isStrictBreakActive = false, breakTimeRemaining = "00:00:00") }
     }
 
     // --- App Password Logic ---
     fun setMasterPassword(password: String) {
-        prefs.edit().putString("app_master_password", password).apply()
+        prefs.edit().putString("app_master_password", password).commit()
         _uiState.update { it.copy(hasAppPassword = true) }
         databaseRef.child("isLocked").setValue(true)
     }
@@ -204,7 +207,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
 
     // --- Block & Allow List Logic ---
     fun setListMode(mode: String) {
-        prefs.edit().putString("list_mode", mode).apply()
+        prefs.edit().putString("list_mode", mode).commit()
         _uiState.update { it.copy(listMode = mode) }
     }
 
@@ -214,7 +217,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         val currentSet = prefs.getStringSet(key, emptySet())?.toMutableSet() ?: mutableSetOf()
         
         currentSet.add(item.lowercase().trim())
-        prefs.edit().putStringSet(key, currentSet).apply()
+        prefs.edit().putStringSet(key, currentSet).commit()
         
         if (mode == "BLOCK") _uiState.update { it.copy(blockList = currentSet.toList()) }
         else _uiState.update { it.copy(allowList = currentSet.toList()) }
@@ -225,7 +228,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         val currentSet = prefs.getStringSet(key, emptySet())?.toMutableSet() ?: mutableSetOf()
         
         currentSet.remove(item.lowercase().trim())
-        prefs.edit().putStringSet(key, currentSet).apply()
+        prefs.edit().putStringSet(key, currentSet).commit()
         
         if (mode == "BLOCK") _uiState.update { it.copy(blockList = currentSet.toList()) }
         else _uiState.update { it.copy(allowList = currentSet.toList()) }
@@ -233,49 +236,49 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
 
     // --- Toggles ---
     fun toggleKeywords(checked: Boolean) {
-        prefs.edit().putBoolean("blockKeywords", checked).apply()
+        prefs.edit().putBoolean("blockKeywords", checked).commit()
         _uiState.update { it.copy(blockKeywords = checked) }
         databaseRef.child("blockKeywords").setValue(checked)
     }
 
     fun toggleAdultContent(checked: Boolean) {
-        prefs.edit().putBoolean("blockAdult", checked).apply()
+        prefs.edit().putBoolean("blockAdult", checked).commit()
         _uiState.update { it.copy(blockAdultContent = checked) }
         databaseRef.child("blockAdult").setValue(checked)
     }
 
     fun toggleYoutubeShorts(checked: Boolean) {
-        prefs.edit().putBoolean("blockShorts", checked).apply()
+        prefs.edit().putBoolean("blockShorts", checked).commit()
         _uiState.update { it.copy(blockYoutubeShorts = checked) }
         databaseRef.child("blockShorts").setValue(checked)
     }
 
     fun toggleFacebookReels(checked: Boolean) {
-        prefs.edit().putBoolean("blockReels", checked).apply()
+        prefs.edit().putBoolean("blockReels", checked).commit()
         _uiState.update { it.copy(blockFacebookReels = checked) }
         databaseRef.child("blockReels").setValue(checked)
     }
 
     fun toggleUninstallProtection(checked: Boolean, days: Int = 0) {
-        prefs.edit().putBoolean("uninstallProtection", checked).putInt("uninstallProtectionDays", days).apply()
+        prefs.edit().putBoolean("uninstallProtection", checked).putInt("uninstallProtectionDays", days).commit()
         _uiState.update { it.copy(uninstallProtection = checked, uninstallProtectionDays = days) }
         databaseRef.child("uninstallProtection").setValue(checked)
     }
 
     fun togglePhoneReboot(checked: Boolean) {
-        prefs.edit().putBoolean("blockPhoneReboot", checked).apply()
+        prefs.edit().putBoolean("blockPhoneReboot", checked).commit()
         _uiState.update { it.copy(blockPhoneReboot = checked) }
         databaseRef.child("blockPhoneReboot").setValue(checked)
     }
 
     fun toggleRecentAppsScreen(checked: Boolean) {
-        prefs.edit().putBoolean("blockRecentAppsScreen", checked).apply()
+        prefs.edit().putBoolean("blockRecentAppsScreen", checked).commit()
         _uiState.update { it.copy(blockRecentAppsScreen = checked) }
         databaseRef.child("blockRecentAppsScreen").setValue(checked)
     }
 
     fun toggleNewInstalledApps(checked: Boolean) {
-        prefs.edit().putBoolean("blockNewInstalledApps", checked).apply()
+        prefs.edit().putBoolean("blockNewInstalledApps", checked).commit()
         _uiState.update { it.copy(blockNewInstalledApps = checked) }
         databaseRef.child("blockNewInstalledApps").setValue(checked)
     }
