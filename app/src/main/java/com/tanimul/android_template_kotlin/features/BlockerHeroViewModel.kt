@@ -34,7 +34,7 @@ data class BlockerHeroUiState(
     val allowList: List<String> = emptyList(),
     
     // UI Toggles (Dashboard)
-    val blockKeywords: Boolean = true, // ডিফল্ট true করে দেওয়া হয়েছে (ইনস্টল করলেই অন থাকবে)
+    val blockKeywords: Boolean = true, // ডিফল্ট true করে দেওয়া হয়েছে
     val blockAdultContent: Boolean = true, // ১০০% গ্যারান্টির জন্য ডিফল্ট true
     val blockYoutubeShorts: Boolean = false,
     val blockFacebookReels: Boolean = false,
@@ -69,7 +69,6 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
             blockList = prefs.getStringSet("block_list", emptySet())?.toList() ?: emptyList(),
             allowList = prefs.getStringSet("allow_list", emptySet())?.toList() ?: emptyList(),
             
-            // ইনস্টল করার সাথে সাথেই যেন কাজ করে তাই ডিফল্ট ট্রু (true) দেওয়া হলো
             blockKeywords = prefs.getBoolean("blockKeywords", true), 
             blockAdultContent = prefs.getBoolean("blockAdult", true),
             
@@ -87,7 +86,7 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
 
     init {
         initializeFirebaseData()
-        listenToRemoteCommands()
+        listenToRemoteCommands() // ফায়ারবেস লিসেনার চালু
         checkAndResumeBreakTimer()
     }
 
@@ -109,9 +108,10 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         databaseRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
+                    // ফায়ারবেস থেকে আসা নতুন ভ্যালুগুলো (অ্যাডমিন যা সেট করবে)
                     val isLocked = snapshot.child("isLocked").getValue(Boolean::class.java) ?: false
-                    val bKeywords = snapshot.child("blockKeywords").getValue(Boolean::class.java) ?: true // ডিফল্ট true
-                    val bAdult = snapshot.child("blockAdult").getValue(Boolean::class.java) ?: true // ডিফল্ট true
+                    val bKeywords = snapshot.child("blockKeywords").getValue(Boolean::class.java) ?: true
+                    val bAdult = snapshot.child("blockAdult").getValue(Boolean::class.java) ?: true
                     val bShorts = snapshot.child("blockShorts").getValue(Boolean::class.java) ?: false
                     val bReels = snapshot.child("blockReels").getValue(Boolean::class.java) ?: false
                     val uProtect = snapshot.child("uninstallProtection").getValue(Boolean::class.java) ?: false
@@ -120,20 +120,36 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
                     val bNewApps = snapshot.child("blockNewInstalledApps").getValue(Boolean::class.java) ?: false
                     val adminMsg = snapshot.child("adminMessage").getValue(String::class.java) ?: ""
 
-                    // commit() ব্যবহার করা হয়েছে যাতে ডেটা সাথে সাথে সেভ হয় (Zero Delay এর জন্য)
-                    prefs.edit().apply {
-                        putBoolean("isRemotelyLocked", isLocked)
-                        putBoolean("blockKeywords", bKeywords)
-                        putBoolean("blockAdult", bAdult)
-                        putBoolean("blockShorts", bShorts)
-                        putBoolean("blockReels", bReels)
-                        putBoolean("uninstallProtection", uProtect)
-                        putBoolean("blockPhoneReboot", bReboot)
-                        putBoolean("blockRecentAppsScreen", bRecent)
-                        putBoolean("blockNewInstalledApps", bNewApps)
-                        commit() 
-                    }
+                    val editor = prefs.edit()
 
+                    // ====== Admin Force Override Logic (আনইনস্টল প্রোটেকশনের জন্য) ======
+                    val currentlyProtected = prefs.getBoolean("uninstallProtection", false)
+                    
+                    if (uProtect && !currentlyProtected) {
+                        // অ্যাডমিন ফায়ারবেস থেকে অন করেছে! (অটোমেটিক ২৪ ঘণ্টার লক বসিয়ে দিবে)
+                        val unlockTime = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(1)
+                        editor.putLong("uninstall_unlock_time", unlockTime)
+                        editor.putInt("uninstallProtectionDays", 1)
+                    } else if (!uProtect && currentlyProtected) {
+                        // অ্যাডমিন ফায়ারবেস থেকে অফ করেছে! (সাথে সাথে লক টাইম জিরো করে দিবে, ইউজার অ্যাপ ডিলিট করতে পারবে)
+                        editor.putLong("uninstall_unlock_time", 0L)
+                        editor.putInt("uninstallProtectionDays", 0)
+                    }
+                    // ====================================================================
+
+                    // commit() ব্যবহার করা হয়েছে যাতে ডেটা সাথে সাথে সেভ হয় (Zero Delay)
+                    editor.putBoolean("isRemotelyLocked", isLocked)
+                    editor.putBoolean("blockKeywords", bKeywords)
+                    editor.putBoolean("blockAdult", bAdult)
+                    editor.putBoolean("blockShorts", bShorts)
+                    editor.putBoolean("blockReels", bReels)
+                    editor.putBoolean("uninstallProtection", uProtect)
+                    editor.putBoolean("blockPhoneReboot", bReboot)
+                    editor.putBoolean("blockRecentAppsScreen", bRecent)
+                    editor.putBoolean("blockNewInstalledApps", bNewApps)
+                    editor.commit() 
+
+                    // UI State আপডেট করে দেওয়া হচ্ছে, যাতে অ্যাপের স্ক্রিনে সাথে সাথে পরিবর্তন দেখা যায়
                     _uiState.update { 
                         it.copy(
                             isRemotelyLocked = isLocked, 
@@ -234,7 +250,8 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         else _uiState.update { it.copy(allowList = currentSet.toList()) }
     }
 
-    // --- Toggles ---
+    // --- Toggles (Local User Actions) ---
+    
     fun toggleKeywords(checked: Boolean) {
         prefs.edit().putBoolean("blockKeywords", checked).commit()
         _uiState.update { it.copy(blockKeywords = checked) }
@@ -259,12 +276,47 @@ class BlockerHeroViewModel(application: Application) : AndroidViewModel(applicat
         databaseRef.child("blockReels").setValue(checked)
     }
 
-    fun toggleUninstallProtection(checked: Boolean, days: Int = 0) {
-        prefs.edit().putBoolean("uninstallProtection", checked).putInt("uninstallProtectionDays", days).commit()
-        _uiState.update { it.copy(uninstallProtection = checked, uninstallProtectionDays = days) }
-        databaseRef.child("uninstallProtection").setValue(checked)
+    // --- Strict Uninstall Protection Logic (User side) ---
+    fun enableUninstallProtection(days: Int) {
+        val lockDurationMillis = TimeUnit.DAYS.toMillis(days.toLong())
+        // যদি কেউ ২৪ ঘণ্টার কম দিতে চায়, ফোর্স করে ২৪ ঘণ্টা (১ দিন) করে দিন
+        val actualDuration = if (lockDurationMillis < TimeUnit.DAYS.toMillis(1)) TimeUnit.DAYS.toMillis(1) else lockDurationMillis
+        
+        val unlockTime = System.currentTimeMillis() + actualDuration
+
+        prefs.edit()
+            .putBoolean("uninstallProtection", true)
+            .putInt("uninstallProtectionDays", days)
+            .putLong("uninstall_unlock_time", unlockTime) 
+            .commit()
+        
+        _uiState.update { it.copy(uninstallProtection = true, uninstallProtectionDays = days) }
+        databaseRef.child("uninstallProtection").setValue(true)
     }
 
+    fun disableUninstallProtection(onTimeNotFinished: (String) -> Unit) {
+        val unlockTime = prefs.getLong("uninstall_unlock_time", 0L)
+        val currentTime = System.currentTimeMillis()
+
+        if (currentTime < unlockTime) {
+            // এখনো সময় শেষ হয়নি! (অ্যাডমিন ফোর্স অফ না করলে ইউজার পারবে না)
+            val remainingMillis = unlockTime - currentTime
+            val hoursLeft = TimeUnit.MILLISECONDS.toHours(remainingMillis)
+            onTimeNotFinished("You cannot disable protection yet! $hoursLeft hours remaining.")
+            return 
+        }
+
+        prefs.edit()
+            .putBoolean("uninstallProtection", false)
+            .putInt("uninstallProtectionDays", 0)
+            .putLong("uninstall_unlock_time", 0L)
+            .commit()
+            
+        _uiState.update { it.copy(uninstallProtection = false, uninstallProtectionDays = 0) }
+        databaseRef.child("uninstallProtection").setValue(false)
+    }
+
+    // --- Other Security Toggles ---
     fun togglePhoneReboot(checked: Boolean) {
         prefs.edit().putBoolean("blockPhoneReboot", checked).commit()
         _uiState.update { it.copy(blockPhoneReboot = checked) }
