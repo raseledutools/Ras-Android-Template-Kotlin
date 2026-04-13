@@ -3,6 +3,7 @@ package com.tanimul.android_template_kotlin.features
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -48,6 +50,7 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
 
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                 
+                // --- Take a Break Card ---
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable { navController.navigate("take_a_break") },
                     shape = RoundedCornerShape(16.dp),
@@ -63,17 +66,17 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                Text(text = "Quick Actions", color = TextColorLight, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
-
+                
+                // --- Lists Block ---
+                Text(text = "Block Lists", color = TextColorLight, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
+                
                 QuickActionClickableCard(
                     icon = Icons.Default.Block,
-                    title = uiState.blockList.size.toString(),
+                    title = uiState.blockList.size.toString(), 
                     subtitle = "Apps Blocked",
                     onClick = { navController.navigate("app_whitelist") }
                 )
-                
                 Spacer(modifier = Modifier.height(10.dp))
-                
                 QuickActionClickableCard(
                     icon = Icons.Default.Language,
                     title = "Sites", 
@@ -81,40 +84,180 @@ fun HomeScreenView(viewModel: BlockerHeroViewModel, navController: NavController
                     onClick = { navController.navigate("site_whitelist") }
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                QuickActionToggleCard(
-                    icon = Icons.Default.Spellcheck,
-                    title = "Keywords Blocked",
-                    isToggled = uiState.blockKeywords,
-                    onToggle = { viewModel.toggleKeywords(it) },
-                    onConfigure = { }
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
+                // --- Content Blocking (From your Image & PC version) ---
+                Text(text = "Content Blocking", color = Color(0xFFE53935), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
 
                 QuickActionToggleCard(
                     icon = Icons.Default.Warning,
-                    title = "Block Adult Content",
+                    title = "Block Adult content",
                     isToggled = uiState.blockAdultContent, 
-                    onToggle = { viewModel.toggleAdultContent(it) },
-                    onConfigure = { }
+                    onToggle = { viewModel.toggleAdultContent(it) }
                 )
+                Spacer(modifier = Modifier.height(10.dp))
 
+                QuickActionToggleCard(
+                    icon = Icons.Default.Search,
+                    title = "Filter Search results",
+                    isToggled = uiState.filterSearchResults, 
+                    onToggle = { viewModel.toggleFilterSearchResults(it) }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                QuickActionToggleCard(
+                    icon = Icons.Default.ImageSearch,
+                    title = "Block Image/Video search",
+                    isToggled = uiState.blockImageVideoSearch, 
+                    onToggle = { viewModel.toggleImageVideoSearch(it) }
+                )
                 Spacer(modifier = Modifier.height(10.dp))
 
                 QuickActionToggleCard(
                     icon = Icons.Default.SmartDisplay,
-                    title = "Block Reels/Shorts",
+                    title = "Block Instagram/Facebook reels",
+                    isToggled = uiState.blockInstaFbReels, 
+                    onToggle = { viewModel.toggleInstaFbReels(it) }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                QuickActionToggleCard(
+                    icon = Icons.Default.FindInPage,
+                    title = "Block Instagram search",
+                    isToggled = uiState.blockInstaSearch, 
+                    onToggle = { viewModel.toggleInstaSearch(it) }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                QuickActionToggleCard(
+                    icon = Icons.Default.PlayCircleOutline,
+                    title = "Block Youtube shorts",
                     isToggled = uiState.blockYoutubeShorts, 
-                    onToggle = { 
-                        viewModel.toggleYoutubeShorts(it)
-                        viewModel.toggleFacebookReels(it)
-                    },
-                    onConfigure = { }
+                    onToggle = { viewModel.toggleYoutubeShorts(it) }
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                QuickActionToggleCard(
+                    icon = Icons.Default.Send,
+                    title = "Block Telegram search",
+                    isToggled = uiState.blockTelegramSearch, 
+                    onToggle = { viewModel.toggleTelegramSearch(it) }
                 )
                 
                 Spacer(modifier = Modifier.height(30.dp))
+            }
+        }
+    }
+}
+
+// ================= অ্যাপ সিলেকশন স্ক্রিন (একই ফাইলে) =================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppSelectionScreen(viewModel: BlockerHeroViewModel, onBackClick: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsState()
+    var searchQuery by remember { mutableStateOf("") }
+    val appList = listOf("AHA Games", "AI Gallery", "BlockerHero", "Calculator", "Facebook", "YouTube")
+
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF3F6FA))) {
+        TopAppBar(
+            title = { Text("All Apps", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            navigationIcon = {
+                IconButton(onClick = onBackClick, modifier = Modifier.background(Color.White, CircleShape)) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+        )
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search Apps") },
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(16.dp)
+        )
+
+        Card(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 10.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            LazyColumn {
+                items(appList.size) { index ->
+                    val appName = appList[index]
+                    val isLocked = uiState.blockList.contains(appName.lowercase())
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(appName, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        IconButton(onClick = { 
+                            if (isLocked) viewModel.removeFromList("BLOCK", appName) 
+                            else viewModel.addToList(appName) 
+                        }) {
+                            Icon(
+                                imageVector = if (isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                                tint = if (isLocked) PrimaryColor else Color.Gray,
+                                contentDescription = null
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ================= সাইট সিলেকশন স্ক্রিন (একই ফাইলে) =================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SiteSelectionScreen(viewModel: BlockerHeroViewModel, onBackClick: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsState()
+    var siteUrl by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF3F6FA))) {
+        TopAppBar(
+            title = { Text("All Sites", fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            navigationIcon = {
+                IconButton(onClick = onBackClick, modifier = Modifier.background(Color.White, CircleShape)) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+        )
+
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = siteUrl,
+                onValueChange = { siteUrl = it },
+                placeholder = { Text("Enter Website URL") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = { 
+                if (siteUrl.isNotEmpty()) {
+                    viewModel.addToList(siteUrl)
+                    siteUrl = ""
+                }
+            }, colors = ButtonDefaults.buttonColors(containerColor = PrimaryColor)) {
+                Text("Add", color = Color.White)
+            }
+        }
+
+        LazyColumn(modifier = Modifier.padding(16.dp)) {
+            items(uiState.blockList.size) { index ->
+                val site = uiState.blockList[index]
+                if (site.contains(".")) { 
+                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(site)
+                            Icon(Icons.Default.Delete, modifier = Modifier.clickable { viewModel.removeFromList("BLOCK", site) }, tint = Color.Red, contentDescription = null)
+                        }
+                    }
+                }
             }
         }
     }
@@ -161,7 +304,7 @@ fun QuickActionClickableCard(icon: ImageVector, title: String, subtitle: String,
 }
 
 @Composable
-fun QuickActionToggleCard(icon: ImageVector, title: String, isToggled: Boolean, onToggle: (Boolean) -> Unit, onConfigure: () -> Unit) {
+fun QuickActionToggleCard(icon: ImageVector, title: String, isToggled: Boolean, onToggle: (Boolean) -> Unit) {
     Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
         Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(45.dp).background(SecondaryColor, CircleShape), contentAlignment = Alignment.Center) {
@@ -169,12 +312,7 @@ fun QuickActionToggleCard(icon: ImageVector, title: String, isToggled: Boolean, 
             }
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = if(isToggled) "On" else "Off", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextColorDark)
-                Text(text = title, fontSize = 14.sp, color = TextColorDark)
-                Spacer(modifier = Modifier.height(4.dp))
-                TextButton(onClick = onConfigure, contentPadding = PaddingValues(0.dp), modifier = Modifier.height(24.dp)) {
-                    Text("Configure ->", color = PrimaryColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
+                Text(text = title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextColorDark)
             }
             Switch(checked = isToggled, onCheckedChange = onToggle, colors = SwitchDefaults.colors(checkedThumbColor = Color.White, checkedTrackColor = PrimaryColor, uncheckedThumbColor = Color.White, uncheckedTrackColor = Color.LightGray))
         }
