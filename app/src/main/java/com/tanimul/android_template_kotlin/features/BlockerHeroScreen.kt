@@ -1,7 +1,11 @@
 package com.tanimul.android_template_kotlin.features
 
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -210,21 +214,23 @@ fun ProgressItem(title: String, value: String, icon: ImageVector) {
     }
 }
 
-
 // =============================================================================
 // RASFOCUS BLOCKED APPS & WEBSITES SCREEN (Interactive & Premium)
 // =============================================================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RasfocusBlockedScreen() {
+fun RasfocusBlockedScreen(viewModel: BlockerHeroViewModel) { // ViewModel যুক্ত করা হয়েছে
     var selectedTab by remember { mutableStateOf(0) }
     var showAddAppDialog by remember { mutableStateOf(false) }
     var urlToBlock by remember { mutableStateOf("") }
     val context = LocalContext.current
 
+    // Device Admin Setup
+    val devicePolicyManager = context.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+    val componentName = ComponentName(context, MyDeviceAdminReceiver::class.java)
+
     // State for interactive switches
     var isAdultFilterEnabled by remember { mutableStateOf(true) }
-    var isUninstallProtectionEnabled by remember { mutableStateOf(true) }
     var isAccessibilityGranted = true // Dummy state, use real check in production
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -271,7 +277,6 @@ fun RasfocusBlockedScreen() {
                             Text("Block New App")
                         }
                     }
-                    // Interactive Dummy List
                     items(5) { index ->
                         var isBlocked by remember { mutableStateOf(true) }
                         BlockedListItem(
@@ -313,18 +318,52 @@ fun RasfocusBlockedScreen() {
                             title = "Strict Adult Content Blocker",
                             description = "Instantly blocks hardcore, medium, and slang keywords anywhere on the phone.",
                             isChecked = isAdultFilterEnabled,
-                            onCheckedChange = { isAdultFilterEnabled = it }
+                            onCheckedChange = { 
+                                isAdultFilterEnabled = it 
+                                viewModel.toggleAdultContent(it)
+                            }
                         )
                         
                         Spacer(modifier = Modifier.height(12.dp))
                         
-                        // Interactive Toggle 2
-                        ProtectionToggleCard(
-                            title = "Uninstall Protection",
-                            description = "Prevents you from deleting Rasfocus from phone settings when focus is active.",
-                            isChecked = isUninstallProtectionEnabled,
-                            onCheckedChange = { isUninstallProtectionEnabled = it }
-                        )
+                        // ========================================================
+                        // Uninstall Protection Card with Device Admin Button
+                        // ========================================================
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                                Text("Uninstall Protection", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("Prevents you from deleting Rasfocus from phone settings when focus is active.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        // চেক করবে অ্যাডমিন পারমিশন আছে কি না
+                                        if (!devicePolicyManager.isAdminActive(componentName)) {
+                                            // না থাকলে পারমিশন চাওয়ার পেজ ওপেন করবে
+                                            val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                                                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, componentName)
+                                                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Rasfocus needs Admin rights to prevent you from uninstalling the app during an active focus session.")
+                                            }
+                                            context.startActivity(intent)
+                                        } else {
+                                            // পারমিশন থাকলে আপনার ViewModel এর লজিক কল করে লক চালু করে দিবে
+                                            viewModel.enableUninstallProtection(1) // ১ দিনের জন্য লক
+                                            Toast.makeText(context, "Protection Enabled for 24 Hours!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("Turn On Uninstall Protection", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        // ========================================================
                     }
                 }
             }
