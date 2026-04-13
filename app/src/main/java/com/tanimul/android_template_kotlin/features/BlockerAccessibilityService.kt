@@ -1,4 +1,5 @@
 package com.tanimul.android_template_kotlin.features
+
 import android.accessibilityservice.AccessibilityService
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -13,7 +14,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     // ================= ডাটাবেস লিস্ট (আপাতত ডামি, পরে Room DB থেকে আসবে) =================
     
-    // ১. হার্ডকোর, মিডিয়াম এবং বাংলা অ্যাডাল্ট কি-ওয়ার্ড
+    // ১. হার্ডকোর, মিডিয়াম এবং বাংলা অ্যাডাল্ট কি-ওয়ার্ড
     private val allBadWords = listOf(
         "pornhub", "xvideos", "xnxx", "redtube", "brazzers", "xhamster", 
         "chaturbate", "spankbang", "eporner", "youporn", "tube8", "hqporner",
@@ -23,18 +24,18 @@ class BlockerAccessibilityService : AccessibilityService() {
         "item song", "item dance", "mujra", "belly dance", "bikini", 
         "romance", "kissing", "ullu", "web series", "ullongo", 
         "kapor chara", "tiktok dance", "dj dance", "hot dance", "nongra dance",
-        // বাংলা কি-ওয়ার্ড
+        // বাংলা কি-ওয়ার্ড
         "চটি", "চটি গল্প", "সেক্স", "পর্ণ", "পর্ন", "খারাপ ভিডিও", 
         "নগ্ন", "বৌদি", "উলঙ্গ", "হট ভিডিও", "হট সিন", "রোমান্স", 
         "চুমু", "নীল ছবি", "এডাল্ট", "খারাপ ছবি", "নোংরা ভিডিও", 
-        "কাপড় ছাড়া", "খুল্লাম খুল্লা", "বাসর রাত", "গোপন ভিডিও"
+        "কাপড় ছাড়া", "খুল্লাম খুল্লা", "বাসর রাত", "গোপন ভিডিও"
     )
 
-    // ২. ব্লক করা অ্যাপের প্যাকেজ নেম (উদাহরণস্বরূপ ফেসবুক এবং টিকটক)
-    private val blockedApps = listOf("com.facebook.katana", "com.zhiliaoapp.musically")
+    // ২. ব্লক করা অ্যাপের প্যাকেজ নেম (উদাহরণস্বরূপ টিকটক সম্পূর্ণ ব্লক, ফেসবুক আংশিক)
+    private val blockedApps = listOf("com.zhiliaoapp.musically")
 
-    // ৩. ব্লক করা ওয়েবসাইটের লিস্ট
-    private val blockedSites = listOf("facebook.com", "tiktok.com", "instagram.com")
+    // ৩. ব্লক করা ওয়েবসাইটের লিস্ট
+    private val blockedSites = listOf("tiktok.com", "instagram.com")
 
     // ৪. হাদিস ও সতর্কবার্তা
     private val hadiths = listOf(
@@ -47,7 +48,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        // সার্ভিস চালু হওয়ার সাথে সাথেই Usage Stats-এর পাহারাদার ব্যাকগ্রাউন্ডে চালু হয়ে যাবে
+        // সার্ভিস চালু হওয়ার সাথে সাথেই Usage Stats-এর পাহারাদার ব্যাকগ্রাউন্ডে চালু হয়ে যাবে
         startUsageStatsMonitor()
     }
 
@@ -63,20 +64,20 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // ================= ২. কি-ওয়ার্ড ব্লকিং (যেকোনো জায়গায় টাইপ করলে) =================
+        // ================= ২. কি-ওয়ার্ড ব্লকিং (যেকোনো জায়গায় টাইপ করলে) =================
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val typedText = event.text.toString().lowercase()
             if (typedText.isNotEmpty()) {
                 for (word in allBadWords) {
                     if (typedText.contains(word)) {
-                        triggerInstantBlock("খারাপ শব্দ টাইপ করা নিষেধ!")
+                        triggerInstantBlock("খারাপ শব্দ টাইপ করা নিষেধ! (ADULT)")
                         return
                     }
                 }
             }
         }
 
-        // ================= ৩. ওয়েবসাইট ব্লকিং (ব্রাউজারের URL বার স্ক্যান) =================
+        // ================= ৩. ওয়েবসাইট ব্লকিং (ব্রাউজারের URL বার স্ক্যান) =================
         if (rootNode != null && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             // ক্রোম বা অন্য ব্রাউজারের URL বার খোঁজা
             val urlNodes = rootNode.findAccessibilityNodeInfosByViewId("com.android.chrome:id/url_bar")
@@ -84,7 +85,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 val urlText = urlNodes[0].text?.toString()?.lowercase() ?: ""
                 for (site in blockedSites) {
                     if (urlText.contains(site)) {
-                        triggerInstantBlock("এই ওয়েবসাইটটি আপনার ফোকাস লিস্টে ব্লক করা আছে!")
+                        triggerInstantBlock("এই ওয়েবসাইটটি আপনার ফোকাস লিস্টে ব্লক করা আছে!")
                         urlNodes[0].recycle()
                         return
                     }
@@ -93,18 +94,23 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // ================= ৪. ইউটিউব শর্টস এবং ফেসবুক রিলস ব্লকিং =================
+        // ================= ৪. ইউটিউব শর্টস এবং ফেসবুক রিলস ১০০% ব্লকিং =================
         if (rootNode != null && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             
             // ইউটিউব শর্টস লজিক
             if (packageName == "com.google.android.youtube") {
                 val shortsNodes = rootNode.findAccessibilityNodeInfosByText("Shorts")
-                if (shortsNodes.isNotEmpty()) {
-                    for (node in shortsNodes) {
-                        if (node.contentDescription?.toString()?.contains("Shorts", ignoreCase = true) == true || 
-                            node.text?.toString()?.equals("Shorts", ignoreCase = true) == true) {
-                            
-                            performGlobalAction(GLOBAL_ACTION_BACK) 
+                val selectedShorts = rootNode.findAccessibilityNodeInfosByText("Selected, Shorts") // যখন বটম নেভিগেশন বারে সিলেক্ট থাকে
+
+                // যদি "Shorts" বা "Selected, Shorts" খুঁজে পায়
+                if (shortsNodes.isNotEmpty() || selectedShorts.isNotEmpty()) {
+                    for (node in shortsNodes + selectedShorts) {
+                        val desc = node.contentDescription?.toString()?.trim()?.lowercase() ?: ""
+                        val text = node.text?.toString()?.trim()?.lowercase() ?: ""
+                        
+                        // নিশ্চিত করা যে এটি আসলেই শর্টস ট্যাব বা ভিডিও
+                        if (desc == "shorts" || text == "shorts" || desc.contains("selected, shorts") || text.contains("selected, shorts")) {
+                            triggerInstantBlock("YOUTUBE SHORTS BLOCKED!") // আগের BlockActivity তে লাল স্ক্রিন আনবে
                             node.recycle()
                             return
                         }
@@ -113,19 +119,22 @@ class BlockerAccessibilityService : AccessibilityService() {
                 }
             }
 
-            // ফেসবুক রিলস লজিক
-            if (packageName == "com.facebook.katana") {
+            // ফেসবুক রিলস লজিক (Lite এবং Main App উভয়ের জন্য)
+            if (packageName == "com.facebook.katana" || packageName == "com.facebook.lite") {
                 val reelsNodes = rootNode.findAccessibilityNodeInfosByText("Reels")
                 val reelNodes = rootNode.findAccessibilityNodeInfosByText("Reel")
-                val allReelsNodes = reelsNodes + reelNodes
+                val selectedReels = rootNode.findAccessibilityNodeInfosByText("Selected, Reels")
+                val allReelsNodes = reelsNodes + reelNodes + selectedReels
 
                 if (allReelsNodes.isNotEmpty()) {
                     for (node in allReelsNodes) {
-                        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
-                        val text = node.text?.toString()?.lowercase() ?: ""
+                        val desc = node.contentDescription?.toString()?.trim()?.lowercase() ?: ""
+                        val text = node.text?.toString()?.trim()?.lowercase() ?: ""
                         
-                        if (desc.contains("reels") || text == "reels" || text == "reel") {
-                            performGlobalAction(GLOBAL_ACTION_BACK)
+                        // নিশ্চিত করা যে এটি রিলস সেকশন
+                        if (desc == "reels" || desc == "reel" || text == "reels" || text == "reel" || 
+                            desc.contains("selected, reels") || text.contains("reels video")) {
+                            triggerInstantBlock("FACEBOOK REELS BLOCKED!") // আগের BlockActivity তে নীল স্ক্রিন আনবে
                             node.recycle()
                             return
                         }
@@ -133,12 +142,13 @@ class BlockerAccessibilityService : AccessibilityService() {
                     }
                 }
             }
+            // মেমরি লিক রোধে rootNode রিসাইকেল করা
             rootNode.recycle()
         }
     }
 
     // ================= ৫. Usage Stats মনিটর (The Hybrid Smart Logic) =================
-    // যদি কোনো অ্যাপ Accessibility-কে ফাঁকি দিয়ে ওপেন হয়েও যায়, এই লজিক তাকে ধরে ফেলবে
+    // যদি কোনো অ্যাপ Accessibility-কে ফাঁকি দিয়ে ওপেন হয়েও যায়, এই লজিক তাকে ধরে ফেলবে
     private fun startUsageStatsMonitor() {
         serviceScope.launch {
             val usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
@@ -155,7 +165,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                             
                             // মেইন থ্রেডে ব্লক স্ক্রিন কল করতে হবে
                             withContext(Dispatchers.Main) {
-                                triggerInstantBlock("Usage Access: ব্লক করা অ্যাপ চালানোর চেষ্টা করা হয়েছে!")
+                                triggerInstantBlock("Usage Access: ব্লক করা অ্যাপ চালানোর চেষ্টা করা হয়েছে!")
                             }
                         }
                     }
@@ -165,12 +175,14 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
     }
 
-    // অ্যাপ ক্লোজ করে একদম ইনস্ট্যান্ট হাদিস স্ক্রিনে পাঠানোর ফাংশন
+    // অ্যাপ ক্লোজ করে একদম ইনস্ট্যান্ট ব্লক স্ক্রিনে পাঠানোর ফাংশন
     private fun triggerInstantBlock(reason: String) {
+        // ১. আগে ব্যাকগ্রাউন্ডে পাঠিয়ে দিবে (যাতে ইউজার ভিডিও আর দেখতে না পারে)
         performGlobalAction(GLOBAL_ACTION_HOME)
 
         val randomHadith = hadiths.random()
 
+        // ২. সাথে সাথে স্পেশাল ব্লক স্ক্রিনটা ওপেন করে দিবে
         val intent = Intent(this, BlockActivity::class.java).apply {
             putExtra("HADITH_TEXT", randomHadith)
             putExtra("BLOCK_REASON", reason)
