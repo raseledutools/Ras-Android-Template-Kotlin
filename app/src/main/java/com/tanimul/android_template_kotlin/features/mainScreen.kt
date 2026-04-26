@@ -1,4 +1,4 @@
-package com.tanimul.android_template_kotlin
+package com.tanimul.android_template_kotlin.features
 
 import android.app.Activity
 import android.os.Bundle
