@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -28,11 +29,22 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.system.exitProcess
 
 // ==========================================
-// C++ Colors Translation
+// ১. আপনার তৈরি করা ফাইলগুলোর ইমপোর্ট লিঙ্ক
+// ==========================================
+import com.tanimul.android_template_kotlin.features.MainScreen
+import com.tanimul.android_template_kotlin.features.Blocks
+import com.tanimul.android_template_kotlin.features.Adult
+import com.tanimul.android_template_kotlin.features.Focus
+import com.tanimul.android_template_kotlin.features.Special
+import com.tanimul.android_template_kotlin.features.Stats
+import com.tanimul.android_template_kotlin.features.Settings
+
+// ==========================================
+// Color Palette
 // ==========================================
 val ColTeal = Color(0xFF0CA8B0)         // ColTeal(255, 12, 168, 176)
 val ColBgContent = Color(0xFFF8FAFC)    // ColBgContent(255, 248, 250, 252)
@@ -42,18 +54,132 @@ val ColUpgradeBtn = Color(0xFFF39C12)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Single Instance (Mutex) লজিক অ্যান্ড্রয়েডে AndroidManifest.xml-এ android:launchMode="singleTask" দিয়ে করতে হয়।
-        // Boot/AutoRun এর লজিক BroadcastReceiver দিয়ে হ্যান্ডেল হবে।
-
         setContent {
             MaterialTheme {
-                RasFocusMainApp()
+                RootNavigation()
             }
         }
     }
 }
 
+// ==========================================
+// ২. মূল নেভিগেশন (Splash -> Permission -> MainApp)
+// ==========================================
+@Composable
+fun RootNavigation() {
+    val rootNavController = rememberNavController()
+
+    NavHost(navController = rootNavController, startDestination = "splash") {
+        composable("splash") { SplashScreen(rootNavController) }
+        composable("permissions") { PermissionsScreen(rootNavController) }
+        composable("main_app") { RasFocusMainApp() }
+    }
+}
+
+// ==========================================
+// ৩. স্প্ল্যাশ স্ক্রিন (Splash Screen)
+// ==========================================
+@Composable
+fun SplashScreen(navController: NavHostController) {
+    // ২ সেকেন্ড পর অটোমেটিক পারমিশন পেজে চলে যাবে
+    LaunchedEffect(Unit) {
+        delay(2000)
+        navController.navigate("permissions") {
+            popUpTo("splash") { inclusive = true } // স্প্ল্যাশ পেজ ব্যাকস্ট্যাক থেকে মুছে ফেলা
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColTeal),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.GpsFixed,
+                contentDescription = "App Logo",
+                tint = Color.White,
+                modifier = Modifier.size(100.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("RasFocus Pro", fontSize = 32.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Protect your focus and time", fontSize = 14.sp, color = Color(0xFFD0F0F0))
+            
+            Spacer(modifier = Modifier.height(40.dp))
+            CircularProgressIndicator(color = Color.White)
+        }
+    }
+}
+
+// ==========================================
+// ৪. পারমিশন স্ক্রিন (Permissions Screen)
+// ==========================================
+@Composable
+fun PermissionsScreen(navController: NavHostController) {
+    var accGranted by remember { mutableStateOf(false) }
+    var drawOverGranted by remember { mutableStateOf(false) }
+    var adminGranted by remember { mutableStateOf(false) }
+
+    val allGranted = accGranted && drawOverGranted && adminGranted
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ColBgContent)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Setup Required", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = ColTextDark)
+        Text("RasFocus needs these permissions to block apps and adult content effectively.", color = Color.Gray, modifier = Modifier.padding(top = 8.dp, bottom = 32.dp))
+
+        PermissionItem("Accessibility Service", "Detects when you open a blocked app or website.", accGranted) { accGranted = !accGranted }
+        PermissionItem("Display Over Other Apps", "Allows showing the lock screen over blocked content.", drawOverGranted) { drawOverGranted = !drawOverGranted }
+        PermissionItem("Device Administrator", "Prevents unauthorized uninstallation of RasFocus.", adminGranted) { adminGranted = !adminGranted }
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        Button(
+            onClick = {
+                if (allGranted) {
+                    navController.navigate("main_app") {
+                        popUpTo("permissions") { inclusive = true }
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(55.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = if (allGranted) ColTeal else Color.LightGray),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Continue to App", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+    }
+}
+
+@Composable
+fun PermissionItem(title: String, desc: String, isGranted: Boolean, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable { onClick() },
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(if(isGranted) Color(0xFFD1FAE5) else Color(0xFFF1F5F9)), contentAlignment = Alignment.Center) {
+                Icon(if(isGranted) Icons.Default.Check else Icons.Default.Settings, contentDescription = null, tint = if(isGranted) Color(0xFF10B981) else Color.Gray)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ColTextDark)
+                Text(desc, fontSize = 12.sp, color = Color.Gray)
+            }
+            Switch(checked = isGranted, onCheckedChange = { onClick() }, colors = SwitchDefaults.colors(checkedThumbColor = ColTeal, checkedTrackColor = ColTeal.copy(alpha = 0.5f)))
+        }
+    }
+}
+
+// ==========================================
+// ৫. মেইন সাইডবার অ্যাপ
+// ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RasFocusMainApp() {
@@ -62,10 +188,10 @@ fun RasFocusMainApp() {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // C++ System Tray Hide Logic -> অ্যান্ড্রয়েডে ব্যাক বাটন চাপলে অ্যাপ হাইড হবে, ক্লোজ হবে না
+    // পিসির System Tray এর মত ব্যাক বাটন লজিক
     BackHandler {
         val activity = context as? Activity
-        activity?.moveTaskToBack(true) // System Tray এর মত ব্যাকগ্রাউন্ডে চলে যাবে
+        activity?.moveTaskToBack(true)
     }
 
     val menuItems = listOf(
@@ -116,19 +242,19 @@ fun RasFocusMainApp() {
         ) { paddingValues ->
             
             // ==========================================
-            // Main Navigation Area (C++ DrawMainArea)
+            // ৬. আপনার তৈরি করা ফাইলগুলোর অরিজিনাল লিঙ্ক
             // ==========================================
             NavHost(
                 navController = navController,
                 startDestination = "dashboard",
                 modifier = Modifier.padding(paddingValues)
             ) {
-                // পিসির মতো আলাদা ফাঁকা স্ক্রিন কল হচ্ছে
-                composable("dashboard") { Home(navController) }
+                // সব ফাইল এখন লাইভ! কোনো ডামি টেক্সট নেই
+                composable("dashboard") { MainScreen(navController, drawerState, scope) }
                 composable("blocks") { Blocks() }
                 composable("adult_block") { Adult() }
                 composable("deep_study") { Focus() }
-                composable("special_feature") { SpecialFeature() }
+                composable("special_feature") { Special() }
                 composable("statistics") { Stats() }
                 composable("settings") { Settings() }
             }
@@ -137,89 +263,7 @@ fun RasFocusMainApp() {
 }
 
 // ==========================================
-// C++ Empty Tab Screens Translation (ফাঁকা স্ক্রিন)
-// ==========================================
-
-@Composable
-fun Home(navController: NavHostController) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ColBgContent)
-    ) {
-        // ড্যাশবোর্ডের ডিজাইন এখানে আসবে...
-        
-        // ==========================================
-        // C++ Secret DEBUG KILL BUTTON (Bottom Right)
-        // ==========================================
-        Button(
-            onClick = { 
-                // C++ taskkill /F /IM RasObserve.exe লজিক
-                exitProcess(0) 
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE63232)), // C++ Color(255, 230, 50, 50)
-            shape = RoundedCornerShape(0.dp),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp)
-                .size(width = 110.dp, height = 35.dp)
-        ) {
-            Text("DEBUG KILL", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun Blocks() {
-    // C++ DrawBlocksTab()
-    Box(modifier = Modifier.fillMaxSize().background(ColBgContent)) {
-        // Blocks এর ডিজাইন হবে
-    }
-}
-
-@Composable
-fun Adult() {
-    // C++ DrawAdultBlockTab()
-    Box(modifier = Modifier.fillMaxSize().background(ColBgContent)) {
-        // Adult Block এর ডিজাইন হবে
-    }
-}
-
-@Composable
-fun Focus() {
-    // C++ DrawDeepStudyTab()
-    Box(modifier = Modifier.fillMaxSize().background(ColBgContent)) {
-        // Deep Study এর ডিজাইন হবে
-    }
-}
-
-@Composable
-fun SpecialFeature() {
-    // C++ DrawSpecialFeatureTab()
-    Box(modifier = Modifier.fillMaxSize().background(ColBgContent)) {
-        // Special Feature এর ডিজাইন হবে
-    }
-}
-
-@Composable
-fun Stats() {
-    // C++ DrawStatisticsTab()
-    Box(modifier = Modifier.fillMaxSize().background(ColBgContent)) {
-        // Statistics এর ডিজাইন হবে
-    }
-}
-
-@Composable
-fun Settings() {
-    // C++ DrawSettingsTab()
-    Box(modifier = Modifier.fillMaxSize().background(ColBgContent)) {
-        // Settings এর ডিজাইন হবে
-    }
-}
-
-
-// ==========================================
-// C++ Sidebar Implementation
+// ৭. সাইডবার ডিজাইন
 // ==========================================
 @Composable
 fun RasFocusSidebar(
@@ -270,7 +314,7 @@ fun RasFocusSidebar(
 
             val context = LocalContext.current
             Button(
-                onClick = { Toast.makeText(context, "Upgrade to Pro dialog will open here.", Toast.LENGTH_SHORT).show() }, // C++ MessageBox logic
+                onClick = { Toast.makeText(context, "Upgrade to Pro dialog will open here.", Toast.LENGTH_SHORT).show() },
                 colors = ButtonDefaults.buttonColors(containerColor = ColUpgradeBtn),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).height(50.dp)
