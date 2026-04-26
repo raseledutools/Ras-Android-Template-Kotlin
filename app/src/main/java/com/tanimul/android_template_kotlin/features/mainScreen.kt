@@ -54,12 +54,12 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
         }
 
         Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            // ওয়েলকাম মেসেজ
+            // ওয়েলকাম মেসেজ
             Text("Welcome back! Your productivity control center is ready.", color = Color.Gray, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(24.dp))
 
             // ==========================================
-            // ২. টিয়াল (Teal) কালারের বড় ব্যানার
+            // ২. টিয়াল (Teal) কালারের বড় ব্যানার
             // ==========================================
             Box(
                 modifier = Modifier
@@ -93,7 +93,7 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
             Text("Quick Actions & Setup", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF323232))
             Spacer(modifier = Modifier.height(16.dp))
 
-            // প্রথম সারি (এই দুটিতে নেভিগেশন লিঙ্ক দেওয়া আছে)
+            // প্রথম সারি
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -108,16 +108,16 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // দ্বিতীয় সারি (এগুলো আপাতত Coming Soon)
+            // দ্বিতীয় সারি (এখন এগুলোও সরাসরি নেভিগেট করবে)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 QuickActionCard("Deep Study", "Pomodoro & focus", Icons.Default.Visibility, Modifier.weight(1f)) {
-                    Toast.makeText(context, "Feature coming soon!", Toast.LENGTH_SHORT).show()
+                    navController.navigate("deep_study") // আপডেট করা হয়েছে
                 }
                 QuickActionCard("Statistics", "View your progress", Icons.Default.BarChart, Modifier.weight(1f)) {
-                    Toast.makeText(context, "Feature coming soon!", Toast.LENGTH_SHORT).show()
+                    navController.navigate("statistics") // আপডেট করা হয়েছে
                 }
             }
         }
