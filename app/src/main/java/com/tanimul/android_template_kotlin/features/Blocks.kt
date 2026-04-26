@@ -1,7 +1,12 @@
 package com.tanimul.android_template_kotlin.features
 
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -10,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,13 +31,34 @@ val SClrBg = Color(0xFFF8FAFC)
 val SClrGreen = Color(0xFF5AAA14)
 val SClrRed = Color(0xFFE74C3C)
 
-// Data Class for Block List (C++ BlockItem)
+// Data Class for Block List
 data class BlockItem(val name: String, val isSystemLocked: Boolean = false)
+
+// ==========================================
+// NEW: ১০০% অ্যাকুরেট অ্যাপ লিস্ট ফেচ করার ফাংশন
+// ==========================================
+data class InstalledApp(val name: String, val packageName: String)
+
+fun getInstalledAppsList(context: Context): List<InstalledApp> {
+    val pm = context.packageManager
+    val intent = Intent(Intent.ACTION_MAIN, null).apply {
+        addCategory(Intent.CATEGORY_LAUNCHER)
+    }
+    // যেসব অ্যাপের লঞ্চার আইকন আছে, শুধু সেগুলোই আনবে
+    val resolveInfoList = pm.queryIntentActivities(intent, 0)
+    return resolveInfoList.map {
+        InstalledApp(
+            name = it.loadLabel(pm).toString(),
+            packageName = it.activityInfo.packageName
+        )
+    }.distinctBy { it.packageName }.sortedBy { it.name } // নাম অনুযায়ী সাজানো
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Blocks() {
-    // --- State Variables (C++ Static Variables Translation) ---
+    // --- State Variables ---
     var currentBlockTab by remember { mutableIntStateOf(0) }
     var controlMode by remember { mutableIntStateOf(0) } // 0: Self, 1: Friend
     var isFocusActive by remember { mutableStateOf(false) }
@@ -60,6 +87,7 @@ fun Blocks() {
     var inputTitleText by remember { mutableStateOf("") }
 
     val scrollState = rememberScrollState()
+    val context = LocalContext.current // Context for PackageManager
 
     Column(
         modifier = Modifier
@@ -97,7 +125,6 @@ fun Blocks() {
                 
                 // --- Controls Row (Self Control & Start Focus) ---
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    // Control Mode Dropdown
                     var expandedControl by remember { mutableStateOf(false) }
                     ExposedDropdownMenuBox(expanded = expandedControl, onExpandedChange = { if(!isFocusActive) expandedControl = it }) {
                         OutlinedTextField(
@@ -113,7 +140,6 @@ fun Blocks() {
                         }
                     }
 
-                    // Start Focus Button
                     Button(
                         onClick = {
                             if (isFocusActive) {
@@ -173,7 +199,6 @@ fun Blocks() {
                     ) { Text("+ Add") }
                 }
                 
-                // Web List Box
                 Box(modifier = Modifier.fillMaxWidth().height(150.dp).background(Color.White).border(1.dp, Color.LightGray)) {
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         webList.forEach { item ->
@@ -204,7 +229,7 @@ fun Blocks() {
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = appInputText, onValueChange = { appInputText = it },
-                        placeholder = { Text("e.g. telegram.exe") },
+                        placeholder = { Text("e.g. com.whatsapp") },
                         modifier = Modifier.weight(1f), shape = RoundedCornerShape(8.dp), enabled = !isFocusActive
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -215,7 +240,6 @@ fun Blocks() {
                     ) { Text("+ Add") }
                 }
 
-                // App List Box
                 Box(modifier = Modifier.fillMaxWidth().height(150.dp).background(Color.White).border(1.dp, Color.LightGray)) {
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         appList.forEach { item ->
@@ -232,10 +256,9 @@ fun Blocks() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Bottom 3 Green Buttons (Add exe, Store, Title)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Button(onClick = { /* Android File Picker Logic */ }, colors = ButtonDefaults.buttonColors(SClrGreen), shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f).padding(end = 4.dp), enabled = !isFocusActive) { Text("Add app...", fontSize = 10.sp) }
-                    Button(onClick = { showStoreOverlay = true }, colors = ButtonDefaults.buttonColors(SClrGreen), shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f).padding(horizontal = 2.dp), enabled = !isFocusActive) { Text("Add System...", fontSize = 10.sp) }
+                    Button(onClick = { /* File Picker */ }, colors = ButtonDefaults.buttonColors(SClrGreen), shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f).padding(end = 4.dp), enabled = !isFocusActive) { Text("Add app...", fontSize = 10.sp) }
+                    Button(onClick = { showStoreOverlay = true }, colors = ButtonDefaults.buttonColors(SClrGreen), shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f).padding(horizontal = 2.dp), enabled = !isFocusActive) { Text("Apps List", fontSize = 10.sp) }
                     Button(onClick = { showTitleOverlay = true }, colors = ButtonDefaults.buttonColors(SClrGreen), shape = RoundedCornerShape(4.dp), modifier = Modifier.weight(1f).padding(start = 4.dp), enabled = !isFocusActive) { Text("Add title...", fontSize = 10.sp) }
                 }
             }
@@ -246,62 +269,74 @@ fun Blocks() {
     // OVERLAYS (Dialogs)
     // ==========================================
 
-    // 1. Time Overlay (Set Focus Duration)
     if (showTimeOverlay) {
         AlertDialog(
             onDismissRequest = { showTimeOverlay = false },
             title = { Text("SET FOCUS DURATION", fontWeight = FontWeight.Bold) },
             text = { Text("Select hours and minutes for your focus session.") },
-            confirmButton = {
-                Button(onClick = { isFocusActive = true; showTimeOverlay = false }, colors = ButtonDefaults.buttonColors(SClrTeal)) { Text("Start Focus") }
-            },
+            confirmButton = { Button(onClick = { isFocusActive = true; showTimeOverlay = false }, colors = ButtonDefaults.buttonColors(SClrTeal)) { Text("Start Focus") } },
             dismissButton = { TextButton(onClick = { showTimeOverlay = false }) { Text("Cancel", color = SClrDark) } }
         )
     }
 
-    // 2. Password Overlay (Friend Control)
     if (showPassOverlay) {
         AlertDialog(
             onDismissRequest = { showPassOverlay = false },
             title = { Text(if (isFocusActive) "ENTER PASSWORD TO STOP" else "ENTER FRIEND'S PASSWORD", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(value = inputPassText, onValueChange = { inputPassText = it }, placeholder = { Text("Password...") }, singleLine = true)
-            },
-            confirmButton = {
-                Button(onClick = { isFocusActive = !isFocusActive; showPassOverlay = false; inputPassText = "" }, colors = ButtonDefaults.buttonColors(SClrTeal)) { Text("Confirm") }
-            },
+            text = { OutlinedTextField(value = inputPassText, onValueChange = { inputPassText = it }, placeholder = { Text("Password...") }, singleLine = true) },
+            confirmButton = { Button(onClick = { isFocusActive = !isFocusActive; showPassOverlay = false; inputPassText = "" }, colors = ButtonDefaults.buttonColors(SClrTeal)) { Text("Confirm") } },
             dismissButton = { TextButton(onClick = { showPassOverlay = false }) { Text("Cancel", color = SClrDark) } }
         )
     }
 
-    // 3. Title Overlay (Window Title)
     if (showTitleOverlay) {
         AlertDialog(
             onDismissRequest = { showTitleOverlay = false },
             title = { Text("ENTER WINDOW/KEYWORD", fontWeight = FontWeight.Bold) },
-            text = {
-                OutlinedTextField(value = inputTitleText, onValueChange = { inputTitleText = it }, placeholder = { Text("e.g. YouTube Shorts") }, singleLine = true)
-            },
-            confirmButton = {
-                Button(onClick = { if(inputTitleText.isNotEmpty()) { appList.add(BlockItem("$inputTitleText (Keyword)")); inputTitleText = ""; showTitleOverlay = false } }, colors = ButtonDefaults.buttonColors(SClrTeal)) { Text("Add Title") }
-            },
+            text = { OutlinedTextField(value = inputTitleText, onValueChange = { inputTitleText = it }, placeholder = { Text("e.g. YouTube Shorts") }, singleLine = true) },
+            confirmButton = { Button(onClick = { if(inputTitleText.isNotEmpty()) { appList.add(BlockItem("$inputTitleText (Keyword)")); inputTitleText = ""; showTitleOverlay = false } }, colors = ButtonDefaults.buttonColors(SClrTeal)) { Text("Add Title") } },
             dismissButton = { TextButton(onClick = { showTitleOverlay = false }) { Text("Cancel", color = SClrDark) } }
         )
     }
 
-    // 4. Store Overlay (System Apps)
+    // ==========================================
+    // NEW: REAL APP LIST DIALOG (100% Accurate)
+    // ==========================================
     if (showStoreOverlay) {
-        val systemApps = listOf("com.android.settings", "com.android.vending", "com.google.android.youtube") // Android default dummy list
+        // অ্যাপ লিস্ট একবার লোড হবে
+        val installedApps = remember { getInstalledAppsList(context) }
+        
         AlertDialog(
             onDismissRequest = { showStoreOverlay = false },
-            title = { Text("ADD SYSTEM APPS", fontWeight = FontWeight.Bold) },
+            title = { Text("SELECT APPS TO BLOCK", fontWeight = FontWeight.Bold) },
             text = {
-                Column {
-                    systemApps.forEach { app ->
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(app, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                            Button(onClick = { appList.add(BlockItem(app, true)) }, colors = ButtonDefaults.buttonColors(SClrGreen), modifier = Modifier.height(30.dp)) { Text("Add", fontSize = 10.sp) }
+                // LazyColumn ব্যবহার করা হয়েছে যাতে ২০০+ অ্যাপ থাকলেও ফোন ল্যাগ না করে
+                LazyColumn(modifier = Modifier.fillMaxWidth().height(350.dp)) {
+                    items(installedApps) { app ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(app.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = SClrDark) // অ্যাপের নাম (যেমন: Facebook)
+                                Text(app.packageName, fontSize = 10.sp, color = Color.Gray) // প্যাকেজ নেম (যেমন: com.facebook.katana)
+                            }
+                            Button(
+                                onClick = { 
+                                    // যদি লিস্টে আগে থেকে না থাকে তবেই অ্যাড হবে
+                                    val isAlreadyAdded = appList.any { it.name == app.packageName }
+                                    if(!isAlreadyAdded) {
+                                        appList.add(BlockItem(app.packageName, true)) 
+                                    }
+                                }, 
+                                colors = ButtonDefaults.buttonColors(SClrGreen), 
+                                modifier = Modifier.height(30.dp)
+                            ) { 
+                                Text("Add", fontSize = 10.sp) 
+                            }
                         }
+                        Divider(color = Color(0xFFEEEEEE))
                     }
                 }
             },
