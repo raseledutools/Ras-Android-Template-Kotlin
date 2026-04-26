@@ -11,7 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -30,7 +29,7 @@ import androidx.navigation.compose.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// আপনার ফিচারের ইমপোর্টগুলো (স্পেলিং ঠিক রাখা হয়েছে)
+// আপনার ফিচারের ইমপোর্টগুলো
 import com.tanimul.android_template_kotlin.features.*
 
 val ColTeal = Color(0xFF0CA8B0)
@@ -40,6 +39,10 @@ val ColTextDark = Color(0xFF323232)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // ডাটাবেস ইঞ্জিন ইনিশিয়ালাইজ করা
+        DataManager.init(this)
+        
         setContent {
             MaterialTheme {
                 AppRootNavigation()
@@ -109,7 +112,7 @@ fun SplashScreen(onFinished: () -> Unit) {
 @Composable
 fun PermissionsPage(onAllGranted: () -> Unit) {
     val context = LocalContext.current
-    // পারমিশন স্টেটগুলো এখানে চেক হবে (রিয়েলটাইম আপডেটের জন্য)
+    // পারমিশন স্টেটগুলো এখানে চেক হবে (রিয়েলটাইম আপডেটের জন্য)
     var accessibilityGranted by remember { mutableStateOf(false) }
     var overlayGranted by remember { mutableStateOf(false) }
 
