@@ -14,6 +14,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+// রিয়েল ডেটাবেস এবং সার্ভিস ইমপোর্ট করা হলো
+import com.tanimul.android_template_kotlin.DataManager
+
 // ==========================================
 // C++ Colors Translation
 // ==========================================
@@ -24,6 +27,9 @@ val DClrGrayText = Color(0xFF787878)
 val DClrBg = Color(0xFFF8FAFC)
 val DClrRed = Color(0xFFE74C3C)
 val DClrGreen = Color(0xFF5AAA14)
+
+// BlockItem ডাটা ক্লাস (যদি অন্য ফাইলে না থাকে, তবে এটি কাজ করবে)
+data class BlockItem(val name: String, var isHoveredCross: Boolean = false)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,25 +47,30 @@ fun Deep_study() {
     var totalSessions by remember { mutableIntStateOf(4) }
     var currentSession by remember { mutableIntStateOf(1) }
 
-    // Toggles
+    // Toggles (ডাটাবেসের সাথে কানেক্ট করা হলো)
     var chkSound by remember { mutableStateOf(false) }
     var chkFloat by remember { mutableStateOf(false) }
     var chkNet by remember { mutableStateOf(false) }
     var chkSet by remember { mutableStateOf(true) }
     var chkTask by remember { mutableStateOf(true) }
     var chkBlockBreak by remember { mutableStateOf(false) }
-    var chkStrict by remember { mutableStateOf(false) }
+    var chkStrict by remember { mutableStateOf(DataManager.isDeepStudyStrict) }
     var chkHideBreakClose by remember { mutableStateOf(false) }
 
     // Sound Setup
     var soundType by remember { mutableIntStateOf(0) }
     val soundOptions = listOf("White Noise", "Classic Brown", "Deep Brown", "Warm Brown", "Heavy Rain", "Waterfall", "Wind", "Deep Focus", "Space Drone", "Cosmic Brown")
 
-    // Allow Lists
+    // Allow Lists (DataManager এর সাথে সিঙ্ক করা হলো)
     var webInputText by remember { mutableStateOf("") }
     var appInputText by remember { mutableStateOf("") }
-    val allowWebs = remember { mutableStateListOf<BlockItem>() }
-    val allowApps = remember { mutableStateListOf<BlockItem>() }
+    
+    val allowWebs = remember { mutableStateListOf<BlockItem>().apply { 
+        addAll(DataManager.userWebList.map { BlockItem(it) }) 
+    } }
+    val allowApps = remember { mutableStateListOf<BlockItem>().apply { 
+        addAll(DataManager.userAppList.map { BlockItem(it) }) 
+    } }
 
     val scrollState = rememberScrollState()
 
@@ -112,11 +123,19 @@ fun Deep_study() {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- START/STOP BUTTON ---
+                // --- START/STOP BUTTON (মেইন ব্রেইনের সাথে কানেক্টেড) ---
                 Button(
                     onClick = { 
                         if (!(isFocusMode && chkStrict)) {
                             isFocusMode = !isFocusMode 
+                            if (isFocusMode) {
+                                // মেইন সার্ভিসকে ডাটা পাঠানো এবং টাইমার চালু করা
+                                DataManager.isDeepStudyStrict = chkStrict
+                                BlockerAccessibilityService.instance?.startDeepStudySession(focusMin, chkSound)
+                            } else {
+                                // ফোকাস স্টপ করা
+                                DataManager.isDeepStudyStrict = false
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -132,7 +151,7 @@ fun Deep_study() {
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                Divider(color = Color.LightGray)
+                HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // --- CUSTOM SESSION SETUP (+/- Buttons) ---
@@ -144,7 +163,7 @@ fun Deep_study() {
                 TimerSetupRow("Total Sessions:", totalSessions, 1, 10, 1, !isFocusMode) { totalSessions = it }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                Divider(color = Color.LightGray)
+                HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // --- TOGGLES & SOUND ---
@@ -180,17 +199,25 @@ fun Deep_study() {
                 DeepCheckbox("Keep Blocking During Break", chkBlockBreak, !(isFocusMode && chkStrict)) { chkBlockBreak = it }
                 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    Checkbox(checked = chkStrict, onCheckedChange = { chkStrict = it }, enabled = !(isFocusMode && chkStrict), colors = CheckboxDefaults.colors(checkedColor = Color(0xFFC81E1E)))
+                    Checkbox(
+                        checked = chkStrict, 
+                        onCheckedChange = { 
+                            chkStrict = it
+                            DataManager.isDeepStudyStrict = it 
+                        }, 
+                        enabled = !(isFocusMode && chkStrict), 
+                        colors = CheckboxDefaults.colors(checkedColor = Color(0xFFC81E1E))
+                    )
                     Text("STRICT MODE (Allow List Only)", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if(chkStrict) Color(0xFFC81E1E) else DClrDark)
                 }
                 
                 DeepCheckbox("Hide Close Btn in Break", chkHideBreakClose, !(isFocusMode && chkStrict)) { chkHideBreakClose = it }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                Divider(color = Color.LightGray)
+                HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- ALLOWED WEBSITES & APPS ---
+                // --- ALLOWED WEBSITES & APPS (Sync with DataManager) ---
                 Text("Allowed Websites", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DClrDark)
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
@@ -200,7 +227,13 @@ fun Deep_study() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { if (webInputText.isNotEmpty()) { allowWebs.add(BlockItem(webInputText)); webInputText = "" } },
+                        onClick = { 
+                            if (webInputText.isNotEmpty()) { 
+                                allowWebs.add(BlockItem(webInputText))
+                                DataManager.userWebList = allowWebs.map { it.name }
+                                webInputText = "" 
+                            } 
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = DClrTeal),
                         shape = RoundedCornerShape(8.dp), modifier = Modifier.height(56.dp), enabled = !(isFocusMode && chkStrict)
                     ) { Text("Add") }
@@ -211,10 +244,13 @@ fun Deep_study() {
                             Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(item.name, color = DClrDark)
                                 if (!(isFocusMode && chkStrict)) {
-                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = DClrRed, modifier = Modifier.clickable { allowWebs.remove(item) })
+                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = DClrRed, modifier = Modifier.clickable { 
+                                        allowWebs.remove(item)
+                                        DataManager.userWebList = allowWebs.map { it.name }
+                                    })
                                 }
                             }
-                            Divider(color = Color(0xFFEEEEEE))
+                            HorizontalDivider(color = Color(0xFFEEEEEE))
                         }
                     }
                 }
@@ -230,7 +266,13 @@ fun Deep_study() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { if (appInputText.isNotEmpty()) { allowApps.add(BlockItem(appInputText)); appInputText = "" } },
+                        onClick = { 
+                            if (appInputText.isNotEmpty()) { 
+                                allowApps.add(BlockItem(appInputText))
+                                DataManager.userAppList = allowApps.map { it.name }
+                                appInputText = "" 
+                            } 
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = DClrTeal),
                         shape = RoundedCornerShape(8.dp), modifier = Modifier.height(56.dp), enabled = !(isFocusMode && chkStrict)
                     ) { Text("Add") }
@@ -241,10 +283,13 @@ fun Deep_study() {
                             Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(item.name, color = DClrDark)
                                 if (!(isFocusMode && chkStrict)) {
-                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = DClrRed, modifier = Modifier.clickable { allowApps.remove(item) })
+                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = DClrRed, modifier = Modifier.clickable { 
+                                        allowApps.remove(item)
+                                        DataManager.userAppList = allowApps.map { it.name }
+                                    })
                                 }
                             }
-                            Divider(color = Color(0xFFEEEEEE))
+                            HorizontalDivider(color = Color(0xFFEEEEEE))
                         }
                     }
                 }
