@@ -2,15 +2,12 @@ package com.tanimul.android_template_kotlin.features
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.core.app.NotificationCompat
 import com.tanimul.android_template_kotlin.DataManager
 import kotlin.random.Random
 
@@ -73,12 +70,12 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Service Private Engine States
     // ==========================================
     private var lastPeriodicPopupTime: Long = System.currentTimeMillis()
-    private var friendControlPassword = "1234" // <-- Missing variable fixed
+    private var friendControlPassword = "1234" 
     
     // Deep Study (Pomodoro) Engine Variables
     private var isDeepStudyActive = false
     private var isDeepStudyBreak = false
-    private var dsKeepBlockingInBreak = false // <-- Missing variable fixed
+    private var dsKeepBlockingInBreak = false 
     private var dsAllowApps = mutableListOf("com.android.chrome", "com.google.android.youtube")
     private var dsAllowWebs = mutableListOf("wikipedia.org")
 
@@ -93,12 +90,16 @@ class BlockerAccessibilityService : AccessibilityService() {
     private var breakScreenView: android.view.View? = null
 
     // ==========================================
-    // STEP 1: Initialization & Anti-Kill Foreground
+    // STEP 1: Initialization (Safe from Crashes)
     // ==========================================
+    override fun onCreate() {
+        super.onCreate()
+        DataManager.init(this) // Service তৈরি হওয়ার সাথে সাথেই ডাটাবেস কল হবে
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this // UI থেকে কল করার জন্য
-        DataManager.init(this) // DataManager চালু করা হলো
 
         val info = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
@@ -108,29 +109,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
         this.serviceInfo = info
 
-        startForegroundServiceNotification()
-    }
-
-    private fun startForegroundServiceNotification() {
-        val channelId = "rasfocus_service_channel"
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "RasFocus Protection Active",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
-
-        val notification = NotificationCompat.Builder(this, channelId)
-            .setContentTitle("RasFocus Pro")
-            .setContentText("Focus is active. Protecting your productivity.")
-            .setSmallIcon(android.R.drawable.ic_secure)
-            .setOngoing(true) 
-            .build()
-
-        startForeground(1001, notification)
+        // 🔴 CRITICAL FIX: startForeground() এবং Notification রিমুভ করা হয়েছে।
+        // Android 12+ এ Accessibility Service এর জন্য ফোরগ্রাউন্ড পারমিশন ক্র্যাশ তৈরি করে।
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -292,7 +272,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             // Deep Study Strict Logic
             if (isDeepStudyActive && DataManager.isDeepStudyStrict && !shouldBlock && !isSystemCriticalApp) {
-                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak // Syncs with local variable
+                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak
                 if (!pauseBlocking) {
                     val appAllowed = dsAllowApps.any { packageName.contains(it) }
                     val webAllowed = url.isNotEmpty() && dsAllowWebs.any { url.contains(it) }
@@ -430,7 +410,11 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
             layout.addView(timerTextView)
             floatingTimerView = layout
-            windowManager?.addView(floatingTimerView, params)
+            
+            // Safe View Addition
+            try {
+                windowManager?.addView(floatingTimerView, params)
+            } catch (e: Exception) {}
         }
     }
 
@@ -446,7 +430,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     private fun removeFloatingTimer() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
-            floatingTimerView?.let { windowManager?.removeView(it) }
+            floatingTimerView?.let { 
+                try { windowManager?.removeView(it) } catch (e: Exception) {}
+            }
             floatingTimerView = null
         }
     }
@@ -489,14 +475,20 @@ class BlockerAccessibilityService : AccessibilityService() {
             layout.addView(subView)
 
             breakScreenView = layout
-            windowManager?.addView(breakScreenView, params)
+            
+            // Safe View Addition
+            try {
+                windowManager?.addView(breakScreenView, params)
+            } catch (e: Exception) {}
         }
     }
 
     private fun removeBreakScreenOverlay() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
-            breakScreenView?.let { windowManager?.removeView(it) }
+            breakScreenView?.let { 
+                try { windowManager?.removeView(it) } catch (e: Exception) {}
+            }
             breakScreenView = null
         }
     }
@@ -550,7 +542,11 @@ class BlockerAccessibilityService : AccessibilityService() {
             linearLayout.addView(reasonView)
 
             overlayView = linearLayout
-            windowManager?.addView(overlayView, layoutParams)
+            
+            // Safe View Addition
+            try {
+                windowManager?.addView(overlayView, layoutParams)
+            } catch (e: Exception) {}
 
             handler.postDelayed({ removeWarningPopup() }, 5000) 
         }
@@ -560,8 +556,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (overlayView != null && windowManager != null) {
             try {
                 windowManager?.removeView(overlayView)
-                overlayView = null
             } catch (e: Exception) {}
+            overlayView = null
         }
     }
 
