@@ -2,15 +2,12 @@ package com.tanimul.android_template_kotlin.features
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import androidx.core.app.NotificationCompat
 import com.tanimul.android_template_kotlin.DataManager
 import kotlin.random.Random
 
@@ -52,7 +49,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Religious & Motivational Quotes
     private val muslimQuotesBn = listOf("মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে...", "লজ্জাশীলতা ঈমানের অঙ্গ।")
     private val muslimQuotesEn = listOf("Tell the believing men to reduce their vision...", "Modesty is a branch of faith.")
-    private val hinduQuotesBn = listOf("যে মনকে নিয়ন্ত্রণ করতে পারে না, তার মন তার সবচেয়ে বড় শত্রু।", "কাম, ক্রোধ এবং লোভ—এই তিনটি নরকের দ্বার।")
+    private val hinduQuotesBn = listOf("যে মনকে নিয়ন্ত্রণ করতে পারে গঠন, তার মন তার সবচেয়ে বড় শত্রু।", "কাম, ক্রোধ এবং লোভ—এই তিনটি নরকের দ্বার।")
     private val hinduQuotesEn = listOf("For him who has conquered the mind, the mind is the best of friends.", "Lust, anger, and greed are the three doors to hell.")
     private val christianQuotesBn = listOf("খারাপ সাহচর্য ভালো চরিত্র নষ্ট করে।", "অহংকার পতনের মূল।")
     private val christianQuotesEn = listOf("Bad company ruins good morals.", "Pride goes before destruction.")
@@ -111,9 +108,6 @@ class BlockerAccessibilityService : AccessibilityService() {
             notificationTimeout = 100
         }
         this.serviceInfo = info
-
-        // 🔴 CRITICAL FIX: startForeground() এবং Notification রিমুভ করা হয়েছে।
-        // Android 12+ এ Accessibility Service এর জন্য ফোরগ্রাউন্ড পারমিশন ক্র্যাশ তৈরি করে।
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -141,8 +135,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         val packageName = event.packageName?.toString() ?: return
 
         // ==========================================
-        // ১. নতুন টাইপিং ফিল্টার লজিক (Select All + Clear)
-        // এই লজিক অ্যাপ মিনিমাইজ করবে না, শুধু টেক্সট মুছে দেবে
+        // ১. টাইপিং ফিল্টার লজিক (Select All + Clear)
         // ==========================================
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val source = event.source
@@ -150,29 +143,27 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             if (DataManager.isAdultFocusActive && hardcoreKeywords.any { typedText.contains(it) }) {
                 source?.let { node ->
-                    // ১. পুরো টেক্সট সিলেক্ট করা (Select All এর কাজ)
+                    // ১. পুরো টেক্সট সিলেক্ট করা
                     val selectArgs = android.os.Bundle()
                     selectArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
                     selectArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, typedText.length)
                     node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectArgs)
 
-                    // ২. সিলেক্টেড টেক্সট মুছে দেওয়া (Backspace এর কাজ)
+                    // ২. সিলেক্টেড টেক্সট মুছে দেওয়া
                     val clearArgs = android.os.Bundle()
                     clearArgs.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
                     node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
                     
-                    // ৩. শুধু ওয়ার্নিং পপআপ দেখানো হবে, অ্যাপ মিনিমাইজ হবে না
+                    // ৩. শুধু ওয়ার্নিং পপআপ দেখানো হবে, অ্যাপ মিনিমাইজ হবে না
                     showWarningPopup("Warning: Inappropriate typing cleared!", true)
                 }
-                return // কাজ শেষ, নিচে আর যাবে না, তাই মিনিমাইজও হবে না!
+                return // কাজ শেষ, নিচে আর যাবে না
             }
         }
 
         // ==========================================
-        // ২. আগের লজিক (উইন্ডো চেঞ্জ এবং মিনিমাইজ)
-        // ==========================================
-
         // 24-Hour Lock & Periodic Popup Checker
+        // ==========================================
         if (DataManager.is24HourLockActive) {
             if (System.currentTimeMillis() >= DataManager.lock24hEndTime) {
                 DataManager.is24HourLockActive = false
@@ -190,6 +181,9 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // ==========================================
+        // ২. কন্টেন্ট এবং উইন্ডো চেকিং (Deep Study & Normal)
+        // ==========================================
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || 
             event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             
@@ -202,7 +196,14 @@ class BlockerAccessibilityService : AccessibilityService() {
             
             val screenText = event.text.joinToString(" ").lowercase()
             
-            checkAndBlockContent(packageName, currentUrl, screenText)
+            // 🟢 NEW LOGIC: Deep Study Strict Mode Checking
+            if (isDeepStudyActive && DataManager.isDeepStudyStrict) {
+                checkDeepStudyBlocking(packageName, currentUrl)
+            } else {
+                // Normal Adult and Simple Blocks Checking
+                checkAndBlockContent(packageName, currentUrl, screenText)
+            }
+            
             rootNode.recycle()
         }
     }
@@ -227,14 +228,44 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // STEP 3: Advanced Filtering Logic (Syncs with DataManager)
+    // 🟢 NEW: Deep Study Specific Blocking Logic
+    // ==========================================
+    private fun checkDeepStudyBlocking(packageName: String, url: String) {
+        // ১. সিস্টেম অ্যাপগুলোকে ব্লক থেকে বাইরে রাখা
+        val isSystemApp = packageName.contains("launcher") || 
+                          packageName.contains("systemui") || 
+                          packageName.contains("dialer") || 
+                          packageName.contains("telecom") || 
+                          packageName == "com.tanimul.android_template_kotlin"
+
+        if (isSystemApp) return
+
+        // ২. DataManager থেকে ইউজারের সেভ করা লেটেস্ট অ্যালাউ লিস্ট নেওয়া
+        val allowedApps = DataManager.userAppList
+        val allowedWebs = DataManager.userWebList
+
+        val isAppAllowed = allowedApps.any { packageName.contains(it, ignoreCase = true) }
+        val isWebAllowed = url.isNotEmpty() && allowedWebs.any { url.contains(it.substringBefore("."), ignoreCase = true) }
+
+        // ৩. ব্রেক টাইম চেকিং
+        val pauseDuringBreak = isDeepStudyBreak && !dsKeepBlockingInBreak
+
+        // ৪. যদি অ্যাপ বা সাইট অ্যালাউ লিস্টে না থাকে এবং ব্রেক না চলে, তবে কিক আউট!
+        if (!isAppAllowed && !isWebAllowed && !pauseDuringBreak) {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+            showWarningPopup("Deep Study Active! Stay Focused on your goals.", true)
+        }
+    }
+
+    // ==========================================
+    // STEP 3: Advanced Filtering Logic (Normal Mode)
     // ==========================================
     private fun checkAndBlockContent(packageName: String, url: String, screenText: String) {
         var shouldBlock = false
         var isSecurityWarning = false
         var blockReason = ""
 
-        // ১. Strict Protection (Settings / Uninstall Block)
+        // ১. Strict Protection
         if (DataManager.blockSettingsAndUninstall) {
             if (packageName.contains("com.android.settings") || packageName.contains("packageinstaller")) {
                 shouldBlock = true
@@ -261,7 +292,6 @@ class BlockerAccessibilityService : AccessibilityService() {
                 shouldBlock = true; isSecurityWarning = true; blockReason = "Facebook Reels are blocked for Focus!"
             }
 
-            // Custom Adult Keywords
             if (!shouldBlock && DataManager.userCustomAdultKeywords.isNotEmpty()) {
                 if (DataManager.userCustomAdultKeywords.any { url.contains(it.lowercase()) || screenText.contains(it.lowercase()) }) {
                     shouldBlock = true; isSecurityWarning = true; blockReason = "Blocked by your custom keywords!"
@@ -281,7 +311,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // ৪. Apps Blocking & Deep Study Strict Logic
+        // ৪. Apps Blocking
         if (!shouldBlock) {
             val isSystemCriticalApp = packageName.contains("launcher") || 
                                       packageName.contains("systemui") || 
@@ -291,7 +321,6 @@ class BlockerAccessibilityService : AccessibilityService() {
                                       packageName.contains("mms") || 
                                       packageName == "com.tanimul.android_template_kotlin"
 
-            // Simple Blocks Apps
             if (DataManager.isFocusActive) {
                 if (DataManager.simpleBlockMode == 1) { 
                     if (DataManager.userAppList.any { packageName.contains(it) }) {
@@ -303,20 +332,6 @@ class BlockerAccessibilityService : AccessibilityService() {
                     }
                 }
             }
-
-            // Deep Study Strict Logic
-            if (isDeepStudyActive && DataManager.isDeepStudyStrict && !shouldBlock && !isSystemCriticalApp) {
-                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak // Syncs with local variable
-                if (!pauseBlocking) {
-                    val appAllowed = dsAllowApps.any { packageName.contains(it) }
-                    val webAllowed = url.isNotEmpty() && dsAllowWebs.any { url.contains(it) }
-                    
-                    if (!appAllowed && !webAllowed) {
-                        shouldBlock = true; isSecurityWarning = true
-                        blockReason = "Deep Study Strict Mode: Stay Focused!"
-                    }
-                }
-            }
         }
 
         if (shouldBlock) {
@@ -325,9 +340,8 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerBlockAction(reason: String, isSecurityWarning: Boolean) {
-        performGlobalAction(GLOBAL_ACTION_HOME) // এই লাইনটি অ্যাপ মিনিমাইজ করে
+        performGlobalAction(GLOBAL_ACTION_HOME) 
         
-        // Streak Penalty
         if (!isSecurityWarning && DataManager.isAdultFocusActive) { 
             DataManager.totalBlockedCount++
             DataManager.cleanStreakDays = 0 
@@ -445,10 +459,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             layout.addView(timerTextView)
             floatingTimerView = layout
             
-            // Safe View Addition
-            try {
-                windowManager?.addView(floatingTimerView, params)
-            } catch (e: Exception) {}
+            try { windowManager?.addView(floatingTimerView, params) } catch (e: Exception) {}
         }
     }
 
@@ -510,10 +521,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             breakScreenView = layout
             
-            // Safe View Addition
-            try {
-                windowManager?.addView(breakScreenView, params)
-            } catch (e: Exception) {}
+            try { windowManager?.addView(breakScreenView, params) } catch (e: Exception) {}
         }
     }
 
@@ -577,10 +585,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             overlayView = linearLayout
             
-            // Safe View Addition
-            try {
-                windowManager?.addView(overlayView, layoutParams)
-            } catch (e: Exception) {}
+            try { windowManager?.addView(overlayView, layoutParams) } catch (e: Exception) {}
 
             handler.postDelayed({ removeWarningPopup() }, 5000) 
         }
@@ -588,9 +593,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private fun removeWarningPopup() {
         if (overlayView != null && windowManager != null) {
-            try {
-                windowManager?.removeView(overlayView)
-            } catch (e: Exception) {}
+            try { windowManager?.removeView(overlayView) } catch (e: Exception) {}
             overlayView = null
         }
     }
