@@ -45,7 +45,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         "youporn.com", "brazzers.com", "spankbang.com", "eporner.com", "chaturbate.com"
     )
 
-    // Religious Quotes (For Normal Blocks)
+    // Religious Quotes (For Full Screen Adult Blocks)
     private val muslimQuotesBn = listOf("মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে...", "লজ্জাশীলতা ঈমানের অঙ্গ।")
     private val muslimQuotesEn = listOf("Tell the believing men to reduce their vision...", "Modesty is a branch of faith.")
     private val hinduQuotesBn = listOf("যে মনকে নিয়ন্ত্রণ করতে পারে গঠন, তার মন তার সবচেয়ে বড় শত্রু।", "কাম, ক্রোধ এবং লোভ—এই তিনটি নরকের দ্বার।")
@@ -71,7 +71,6 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Service Private Engine States
     // ==========================================
     private var lastPeriodicPopupTime: Long = System.currentTimeMillis()
-    private var friendControlPassword = "1234" 
     
     // Deep Study (Pomodoro) Engine Variables
     private var isDeepStudyActive = false
@@ -86,6 +85,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     private var timerTextView: android.widget.TextView? = null
     private var breakScreenView: android.view.View? = null
     private var sessionCompleteView: android.view.View? = null
+    private var fullScreenHadithView: android.view.View? = null // 🟢 Full screen Hadith View
 
     // Audio & Sound Synthesis Variables
     private var audioTrack: android.media.AudioTrack? = null
@@ -172,6 +172,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: return
 
+        // 🟢 ১. টাইপিং ফিল্টার এবং ফুল স্ক্রিন হাদিস লজিক
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val source = event.source
             val typedText = event.text.joinToString(" ").lowercase()
@@ -186,9 +187,9 @@ class BlockerAccessibilityService : AccessibilityService() {
                     val clearArgs = android.os.Bundle()
                     clearArgs.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
                     node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
-                    
-                    showWarningPopup("Warning: Inappropriate typing cleared!", true, isDeepStudyActive)
                 }
+                // 🟢 Adult Content Typed -> Trigger Tab Close & Full Screen Hadith
+                triggerAdultBlockAction(packageName)
                 return
             }
         }
@@ -208,7 +209,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             val rootNode = rootInActiveWindow ?: return
             var currentUrl = ""
             
-            if (packageName.contains("chrome") || packageName.contains("browser") || packageName.contains("edge")) {
+            if (packageName.contains("chrome") || packageName.contains("browser") || packageName.contains("edge") || packageName.contains("firefox")) {
                 currentUrl = extractUrlFromBrowser(rootNode).lowercase()
             }
             
@@ -242,7 +243,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // 🟢 DEEP STUDY BLOCKING LOGIC (Motivational Quotes & Go Back)
+    // 🟢 DEEP STUDY BLOCKING LOGIC
     // ==========================================
     private fun checkDeepStudyBlocking(packageName: String, url: String) {
         if (isSystemApp(packageName)) return
@@ -256,83 +257,101 @@ class BlockerAccessibilityService : AccessibilityService() {
         val pauseDuringBreak = isDeepStudyBreak && !DataManager.dsKeepBlockingInBreak
 
         if (!isAppAllowed && !isWebAllowed && !pauseDuringBreak) {
-            // 🟢 Action: Try to Go Back (Close Tab), if fails go Home
             val goBackSuccess = performGlobalAction(GLOBAL_ACTION_BACK)
-            if (!goBackSuccess) {
-                performGlobalAction(GLOBAL_ACTION_HOME)
-            }
+            if (!goBackSuccess) performGlobalAction(GLOBAL_ACTION_HOME)
             
-            // 🟢 Show Motivational Quote instead of Warning/Hadith
             val quoteList = if (DataManager.adultLanguage == 0) motivationalQuotesBn else motivationalQuotesEn
             val randomQuote = quoteList[Random.nextInt(quoteList.size)]
-            
-            showWarningPopup(randomQuote, false, true) // isDeepStudyMode = true
+            showWarningPopup(randomQuote, false, true)
         }
     }
 
     // ==========================================
-    // NORMAL BLOCKING LOGIC (Hadith & Warnings)
+    // 🟢 NORMAL BLOCKING LOGIC (Fixed Shorts & Adult Web)
     // ==========================================
     private fun checkAndBlockContent(packageName: String, url: String, screenText: String) {
-        var shouldBlock = false
-        var isSecurityWarning = false
+        var shouldBlockNormal = false
+        var isAdultViolation = false
         var blockReason = ""
 
         if (DataManager.blockSettingsAndUninstall) {
             if (packageName.contains("com.android.settings") || packageName.contains("packageinstaller")) {
-                shouldBlock = true; isSecurityWarning = true; blockReason = "Settings are blocked!"
+                shouldBlockNormal = true; blockReason = "Settings are blocked!"
             }
         }
 
-        if (DataManager.isAdultFocusActive && !shouldBlock) {
-            if (adultWebsites.any { url.contains(it) }) {
-                shouldBlock = true; isSecurityWarning = true; blockReason = "Adult website detected!"
+        if (DataManager.isAdultFocusActive && !shouldBlockNormal) {
+            // 🟢 Adult Websites Check (Fixed to check screenText too for hidden URLs)
+            if (adultWebsites.any { url.contains(it) || screenText.contains(it.substringBefore(".")) }) {
+                isAdultViolation = true
             }
             else if (hardcoreKeywords.any { url.contains(it) || screenText.contains(it) }) {
-                shouldBlock = true; isSecurityWarning = true; blockReason = "Inappropriate content detected!"
+                isAdultViolation = true
             }
             else if (romanticKeywords.any { url.contains(it) || screenText.contains(it) }) {
-                shouldBlock = true; isSecurityWarning = true; blockReason = "Restricted content detected!"
+                isAdultViolation = true
             }
-            else if (url.contains("youtube.com/shorts") || url.contains("facebook.com/reel")) {
-                shouldBlock = true; isSecurityWarning = true; blockReason = "Shorts/Reels are blocked!"
+            // 🟢 Super Logic for Shorts and Reels
+            else if ((packageName.contains("youtube") && screenText.contains("shorts")) || url.contains("shorts")) {
+                shouldBlockNormal = true; blockReason = "YouTube Shorts are blocked!"
+            }
+            else if ((packageName.contains("facebook") && screenText.contains("reels")) || url.contains("reel")) {
+                shouldBlockNormal = true; blockReason = "Facebook Reels are blocked!"
             }
         }
 
-        if (DataManager.isFocusActive && !shouldBlock && url.isNotEmpty()) {
+        if (DataManager.isFocusActive && !shouldBlockNormal && !isAdultViolation && url.isNotEmpty()) {
             for (web in DataManager.userWebList) {
                 val coreName = if (web.contains(".")) web.substringBefore(".") else web
                 if (coreName.length > 2 && url.contains(coreName)) {
-                    shouldBlock = true; blockReason = "Website is in your blocklist."; break
+                    shouldBlockNormal = true; blockReason = "Website is in your blocklist."; break
                 }
             }
         }
 
-        if (!shouldBlock) {
+        if (!shouldBlockNormal && !isAdultViolation) {
             if (DataManager.isFocusActive) {
                 if (DataManager.simpleBlockMode == 1) { 
                     if (DataManager.userAppList.any { packageName.contains(it) }) {
-                        shouldBlock = true; blockReason = "App is in your blocklist."
+                        shouldBlockNormal = true; blockReason = "App is in your blocklist."
                     }
                 } else if (DataManager.simpleBlockMode == 0) { 
                     if (!isSystemApp(packageName) && !DataManager.userAppList.any { packageName.contains(it) }) {
-                        shouldBlock = true; blockReason = "Only allowed apps can run."
+                        shouldBlockNormal = true; blockReason = "Only allowed apps can run."
                     }
                 }
             }
         }
 
-        if (shouldBlock) {
+        // Action Executions
+        if (isAdultViolation) {
+            triggerAdultBlockAction(packageName)
+        } else if (shouldBlockNormal) {
             performGlobalAction(GLOBAL_ACTION_HOME) 
-            if (!isSecurityWarning && DataManager.isAdultFocusActive) { 
-                DataManager.totalBlockedCount++
-                DataManager.cleanStreakDays = 0 
-            }
-            
-            // 🟢 Show Hadith or Warning
-            val msg = if (isSecurityWarning || !DataManager.showQuotes) blockReason else getReligiousQuote()
-            showWarningPopup(msg, isSecurityWarning, false)
+            showWarningPopup(if (!DataManager.showQuotes) blockReason else getReligiousQuote(), true, false)
         }
+    }
+
+    // ==========================================
+    // 🟢 ADULT BLOCK ACTION (Closes Tab + Full Screen Hadith)
+    // ==========================================
+    private fun triggerAdultBlockAction(packageName: String) {
+        val isBrowser = packageName.contains("chrome") || packageName.contains("browser") || 
+                        packageName.contains("edge") || packageName.contains("firefox")
+        
+        // 브াউজার হলে ২ বার ব্যাক চাপবে (ট্যাব ক্লোজ করার জন্য), না হলে ডিরেক্ট হোম
+        if (isBrowser) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            Thread.sleep(150) // ছোট্ট গ্যাপ যাতে ডাবল ব্যাক কাজ করে
+            performGlobalAction(GLOBAL_ACTION_BACK)
+        } else {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+        
+        DataManager.totalBlockedCount++
+        DataManager.cleanStreakDays = 0 
+        
+        showFullScreenHadithPopup(getReligiousQuote())
     }
 
     private fun getReligiousQuote(): String {
@@ -345,10 +364,18 @@ class BlockerAccessibilityService : AccessibilityService() {
         return quotesList[Random.nextInt(quotesList.size)]
     }
 
+    // ==========================================
+    // 🟢 DYNAMIC PASSWORD FIX
+    // ==========================================
     fun tryStopFocus(inputPassword: String): Boolean {
         if (DataManager.is24HourLockActive) return false 
+        
+        // 🟢 DataManager বা SharedPreferences থেকে ইউজার সেট করা পাসওয়ার্ড পড়া হচ্ছে। ডিফল্ট 1234
+        val prefs = getSharedPreferences("RasFocusData", Context.MODE_PRIVATE)
+        val savedPassword = prefs.getString("friendPassword", "1234") ?: "1234"
+
         return if (DataManager.controlMode == 1) { 
-            if (inputPassword == friendControlPassword) { DataManager.isAdultFocusActive = false; true } else false 
+            if (inputPassword == savedPassword) { DataManager.isAdultFocusActive = false; true } else false 
         } else { DataManager.isAdultFocusActive = false; true }
     }
 
@@ -614,7 +641,69 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // 🟢 UPDATED: Crash-Free Popup with Deep Study Mode Flag
+    // 🟢 NEW: FULL SCREEN HADITH POPUP (For Adult Content)
+    // ==========================================
+    private fun showFullScreenHadithPopup(message: String) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        handler.post {
+            removeFullScreenHadithPopup() // Remove if already exists
+            windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
+            val layoutParams = android.view.WindowManager.LayoutParams(
+                android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                android.graphics.PixelFormat.TRANSLUCENT
+            )
+
+            val layout = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
+                setBackgroundColor(android.graphics.Color.parseColor("#F12B2C")) // Red Alert Background
+                setPadding(60, 60, 60, 60)
+            }
+
+            val iconView = android.widget.TextView(this).apply {
+                text = "⚠️"
+                textSize = 60f
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, 0, 0, 20)
+            }
+
+            val titleView = android.widget.TextView(this).apply {
+                text = "ASTAGFIRULLAH!"
+                textSize = 35f; setTextColor(android.graphics.Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD); gravity = android.view.Gravity.CENTER
+                setPadding(0, 0, 0, 40)
+            }
+
+            val reasonView = android.widget.TextView(this).apply {
+                text = message; textSize = 22f; setTextColor(android.graphics.Color.WHITE)
+                gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 80)
+            }
+
+            val btnClose = android.widget.Button(this).apply {
+                text = "I Understand & Close"; setTextColor(android.graphics.Color.parseColor("#F12B2C"))
+                val btnShape = android.graphics.drawable.GradientDrawable(); btnShape.cornerRadius = 24f; btnShape.setColor(android.graphics.Color.WHITE)
+                background = btnShape
+                layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 150)
+                setOnClickListener { removeFullScreenHadithPopup() }
+            }
+
+            layout.addView(iconView); layout.addView(titleView); layout.addView(reasonView); layout.addView(btnClose)
+            fullScreenHadithView = layout
+            try { windowManager?.addView(fullScreenHadithView, layoutParams) } catch (e: Exception) {}
+        }
+    }
+
+    private fun removeFullScreenHadithPopup() {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        handler.post {
+            fullScreenHadithView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }
+            fullScreenHadithView = null
+        }
+    }
+
+    // ==========================================
+    // Crash-Free Fast Popup Overlay (Standard)
     // ==========================================
     private fun showWarningPopup(message: String, isSecurityWarning: Boolean, isDeepStudyMode: Boolean) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
