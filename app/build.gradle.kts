@@ -59,7 +59,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // Navigation Compose (এই লাইনটা নতুন যোগ করা হয়েছে আপনার MainActivity এর জন্য)
+    // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // Compose BOM (Bill of Materials)
@@ -73,6 +73,11 @@ dependencies {
     
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
+
+    // ==========================================
+    // 🟢 NEW: Coil for loading Images/Favicons from Internet
+    // ==========================================
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Firebase (রিমোট কন্ট্রোলের জন্য)
     implementation(platform("com.google.firebase:firebase-bom:34.11.0"))
