@@ -29,18 +29,20 @@ import androidx.navigation.compose.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// আপনার ফিচারের ইমপোর্টগুলো
+// DataManager এবং আপনার ফিচারের ইমপোর্টগুলো
+import com.tanimul.android_template_kotlin.DataManager
 import com.tanimul.android_template_kotlin.features.*
 
-val ColTeal = Color(0xFF0CA8B0)
-val ColBgContent = Color(0xFFF8FAFC)
-val ColTextDark = Color(0xFF323232)
+// 'private' অ্যাড করা হয়েছে যাতে অন্য ফাইলের সাথে কনফ্লিক্ট না করে
+private val ColTeal = Color(0xFF0CA8B0)
+private val ColBgContent = Color(0xFFF8FAFC)
+private val ColTextDark = Color(0xFF323232)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // ডাটাবেস ইঞ্জিন ইনিশিয়ালাইজ করা
+        // ডাটাবেস ইঞ্জিন ইনিশিয়ালাইজ করা
         DataManager.init(this)
         
         setContent {
@@ -261,7 +263,7 @@ fun areAllPermissionsGranted(context: Context): Boolean {
 }
 
 fun isAccessibilityServiceEnabled(context: Context): Boolean {
-    val expectedService = "${context.packageName}/${context.packageName}.BlockerAccessibilityService"
+    val expectedService = "${context.packageName}/${context.packageName}.features.BlockerAccessibilityService"
     val enabledServices = AndroidSettings.Secure.getString(context.contentResolver, AndroidSettings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
     return enabledServices?.contains(expectedService) == true
 }
