@@ -2,12 +2,17 @@ package com.tanimul.android_template_kotlin.features
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.app.NotificationCompat
 import com.tanimul.android_template_kotlin.DataManager
 import kotlin.random.Random
 
@@ -15,6 +20,8 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     companion object {
         var instance: BlockerAccessibilityService? = null
+        private const val NOTIFICATION_CHANNEL_ID = "RasFocus_Channel"
+        private const val NOTIFICATION_ID = 1001
     }
 
     // ==========================================
@@ -108,6 +115,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         super.onCreate()
         DataManager.init(this)
         recoveryPrefs = getSharedPreferences("FocusRecovery", Context.MODE_PRIVATE)
+        createNotificationChannel()
     }
 
     override fun onServiceConnected() {
@@ -121,6 +129,8 @@ class BlockerAccessibilityService : AccessibilityService() {
             notificationTimeout = 100
         }
         this.serviceInfo = info
+
+        startForeground(NOTIFICATION_ID, buildNotification("Protection is Active", "Monitoring your focus..."))
 
         // AUTO RECOVERY LOGIC
         val isSavedActive = recoveryPrefs.getBoolean("isTimerActive", false)
@@ -146,6 +156,35 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
     override fun onDestroy() {
         super.onDestroy(); instance = null; stopAmbientSound()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID, "RasFocus Protection", NotificationManager.IMPORTANCE_LOW
+            ).apply { description = "Keeps the app running in background to ensure focus protection." }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(title: String, content: String): Notification {
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(android.R.drawable.ic_secure) 
+            .setContentIntent(pendingIntent)
+            .setOngoing(true) 
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    private fun updateNotification(title: String, content: String) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, buildNotification(title, content))
     }
 
     // ==========================================
@@ -370,7 +409,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     fun tryStopFocus(inputPassword: String): Boolean {
         if (DataManager.is24HourLockActive) return false 
         
-        // 🟢 DataManager বা SharedPreferences থেকে ইউজার সেট করা পাসওয়ার্ড পড়া হচ্ছে। ডিফল্ট 1234
+        // 🟢 DataManager বা SharedPreferences থেকে ইউজার সেট করা পাসওয়ার্ড পড়া হচ্ছে। ডিফল্ট 1234
         val prefs = getSharedPreferences("RasFocusData", Context.MODE_PRIVATE)
         val savedPassword = prefs.getString("friendPassword", "1234") ?: "1234"
 
@@ -407,6 +446,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 isDeepStudyActive = false; DataManager.isDeepStudyStrict = false
                 recoveryPrefs.edit().clear().apply()
                 sendBroadcast(Intent("POMODORO_SESSION_UPDATE"))
+                updateNotification("Protection is Active", "Monitoring your focus...") 
                 showSessionCompletePopup()
             }
         }.start()
@@ -421,11 +461,14 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         dsTimer?.cancel()
         dsTimer = object : android.os.CountDownTimer(timeMillis, 1000) {
-            override fun onTick(millisUntilFinished: Long) {}
+            override fun onTick(millisUntilFinished: Long) {
+                updateNotification("Break Time!", "Enjoy your break. ${(millisUntilFinished/60000)} mins left.")
+            }
             override fun onFinish() {
                 removeBreakScreenOverlay()
                 isDeepStudyActive = false; DataManager.isDeepStudyStrict = false
                 recoveryPrefs.edit().clear().apply() 
+                updateNotification("Protection is Active", "Monitoring your focus...") 
                 showWarningPopup("🎉 Break Completed! Ready to focus?", false, true)
                 sendBroadcast(Intent("POMODORO_SESSION_UPDATE"))
             }
@@ -441,7 +484,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             if (sessionCompleteView != null) return@post
 
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            val params = android.view.WindowManager.LayoutParams(
+            val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -496,7 +539,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             card.addView(title); card.addView(btnRest); card.addView(btnStart); card.addView(btnClose); layout.addView(card)
             sessionCompleteView = layout
-            try { windowManager?.addView(sessionCompleteView, params) } catch (e: Exception) {}
+            try { windowManager?.addView(sessionCompleteView, windowParams) } catch (e: Exception) {}
         }
     }
 
@@ -561,7 +604,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         handler.post {
             if (floatingTimerView != null) return@post
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            val params = android.view.WindowManager.LayoutParams(
+            val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.WRAP_CONTENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
@@ -574,8 +617,8 @@ class BlockerAccessibilityService : AccessibilityService() {
                 background = shape
                 setOnTouchListener { _, event ->
                     when (event.action) {
-                        android.view.MotionEvent.ACTION_DOWN -> { initialX = params.x; initialY = params.y; initialTouchX = event.rawX; initialTouchY = event.rawY; true }
-                        android.view.MotionEvent.ACTION_MOVE -> { params.x = initialX + (event.rawX - initialTouchX).toInt(); params.y = initialY + (event.rawY - initialTouchY).toInt(); windowManager?.updateViewLayout(this, params); true }
+                        android.view.MotionEvent.ACTION_DOWN -> { initialX = windowParams.x; initialY = windowParams.y; initialTouchX = event.rawX; initialTouchY = event.rawY; true }
+                        android.view.MotionEvent.ACTION_MOVE -> { windowParams.x = initialX + (event.rawX - initialTouchX).toInt(); windowParams.y = initialY + (event.rawY - initialTouchY).toInt(); windowManager?.updateViewLayout(this, windowParams); true }
                         else -> false
                     }
                 }
@@ -585,7 +628,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 setTextColor(android.graphics.Color.WHITE); textSize = 22f; setTypeface(null, android.graphics.Typeface.BOLD); text = "00:00:00"
             }
             layout.addView(timerTextView); floatingTimerView = layout
-            try { windowManager?.addView(floatingTimerView, params) } catch (e: Exception) {}
+            try { windowManager?.addView(floatingTimerView, windowParams) } catch (e: Exception) {}
         }
     }
 
@@ -593,7 +636,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
             val mins = (millis / 1000) / 60; val secs = (millis / 1000) % 60; val ms = (millis % 1000) / 10 
-            timerTextView?.text = String.format("%02d:%02d:%02d", mins, secs, ms)
+            val timeString = String.format("%02d:%02d:%02d", mins, secs, ms)
+            timerTextView?.text = timeString
+            updateNotification("Deep Study Active", "Time remaining: $timeString")
         }
     }
 
@@ -610,7 +655,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         handler.post {
             if (breakScreenView != null) return@post
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            val params = android.view.WindowManager.LayoutParams(
+            val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -631,7 +676,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 text = "Breathe deep, rest your eyes, and relax your mind."; textSize = 18f; setTextColor(android.graphics.Color.parseColor("#E2E8F0")); gravity = android.view.Gravity.CENTER
             }
             layout.addView(titleView); layout.addView(subView); breakScreenView = layout
-            try { windowManager?.addView(breakScreenView, params) } catch (e: Exception) {}
+            try { windowManager?.addView(breakScreenView, windowParams) } catch (e: Exception) {}
         }
     }
 
@@ -648,7 +693,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         handler.post {
             removeFullScreenHadithPopup() // Remove if already exists
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            val layoutParams = android.view.WindowManager.LayoutParams(
+            val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -690,7 +735,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             layout.addView(iconView); layout.addView(titleView); layout.addView(reasonView); layout.addView(btnClose)
             fullScreenHadithView = layout
-            try { windowManager?.addView(fullScreenHadithView, layoutParams) } catch (e: Exception) {}
+            try { windowManager?.addView(fullScreenHadithView, windowParams) } catch (e: Exception) {}
         }
     }
 
@@ -710,7 +755,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         handler.post {
             removeWarningPopup()
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            val layoutParams = android.view.WindowManager.LayoutParams(
+            val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
@@ -735,7 +780,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
 
             linearLayout.addView(titleView); linearLayout.addView(reasonView); overlayView = linearLayout
-            try { windowManager?.addView(overlayView, layoutParams) } catch (e: Exception) {}
+            try { windowManager?.addView(overlayView, windowParams) } catch (e: Exception) {}
             handler.postDelayed({ removeWarningPopup() }, 5000) 
         }
     }
