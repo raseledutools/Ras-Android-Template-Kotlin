@@ -28,20 +28,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // DataManager এবং আপনার ফিচারের ইমপোর্টগুলো
 import com.tanimul.android_template_kotlin.DataManager
-import com.tanimul.android_template_kotlin.features.*
 
 // ==========================================
 // C++ Colors Translation & Premium Palette
 // ==========================================
-private val ColTeal = Color(0xFF0CA8B0)         
-private val ColBgContent = Color(0xFFF1F5F9)    
+private val ColTeal = Color(0xFF0CA8B0)
+private val ColBgContent = Color(0xFFF1F5F9)
 private val ColTextDark = Color(0xFF1E293B)
 
 class MainActivity : ComponentActivity() {
@@ -60,8 +58,21 @@ class MainActivity : ComponentActivity() {
 }
 
 // ==========================================
-// ১. মূল নেভিগেশন কন্ট্রোল
+// ১. মূল নেভিগেশন কন্ট্রোল (AppRootNavigation)
 // ==========================================
+@Composable
+fun AppRootNavigation() {
+    val context = LocalContext.current
+    var permissionsGranted by remember { mutableStateOf(areAllPermissionsGranted(context)) }
+
+    if (permissionsGranted) {
+        // পারমিশন দেওয়া থাকলে মেইন অ্যাপ দেখাবে
+        RasFocusMainContent()
+    } else {
+        // পারমিশন না থাকলে পারমিশন পেজ দেখাবে
+        PermissionsPage(onAllGranted = { permissionsGranted = true })
+    }
+}
 
 // ==========================================
 // ৩. পারমিশন পেজ (ডিজাইন + লজিক)
@@ -124,7 +135,6 @@ fun PermissionCard(title: String, desc: String, granted: Boolean, onClick: () ->
 // ==========================================
 // ৪. মেইন অ্যাপ লেআউট (সাইডবার সহ)
 // ==========================================
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RasFocusMainContent() {
     val navController = rememberNavController()
@@ -152,13 +162,11 @@ fun RasFocusMainContent() {
             }
         }
     ) {
-        Scaffold(
-            topBar = {
-                // আমরা টপবার স্ক্যাফোল্ডে না দিয়ে MainScreen এর ভেতরে কাস্টম ডিজাইন করেছি
-            }
-        ) { padding ->
+        Scaffold { padding ->
             NavHost(navController, "dashboard", Modifier.padding(padding)) {
                 composable("dashboard") { MainScreen(navController) { scope.launch { drawerState.open() } } }
+                
+                // এই পেজগুলোর কম্পোজেবল ফাংশন আপনার প্রজেক্টের অন্য ফাইলে থাকতে হবে
                 composable("blocks") { Blocks() }
                 composable("adult_block") { Adult_block() }
                 composable("deep_study") { Deep_study() }
@@ -192,7 +200,7 @@ fun RasFocusSidebar(currentRoute: String, onNavigate: (String) -> Unit) {
 }
 
 @Composable
-fun SidebarItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, route: String, currentRoute: String, onNavigate: (String) -> Unit) {
+fun SidebarItem(label: String, icon: ImageVector, route: String, currentRoute: String, onNavigate: (String) -> Unit) {
     val selected = currentRoute == route
     Row(
         modifier = Modifier
@@ -279,7 +287,7 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
         // ==========================================
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             
-            // একটু নেগেটিভ মার্জিন দিয়ে ব্যানারটাকে হেডারের ওপরে তুলে দেওয়া হলো
+            // একটু নেগেটিভ মার্জিন দিয়ে ব্যানারটাকে হেডারের ওপরে তুলে দেওয়া হলো
             Spacer(modifier = Modifier.height(16.dp))
 
             // ==========================================
