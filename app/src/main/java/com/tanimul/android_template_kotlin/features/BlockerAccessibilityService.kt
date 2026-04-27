@@ -2,12 +2,15 @@ package com.tanimul.android_template_kotlin.features
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.app.NotificationCompat
 import com.tanimul.android_template_kotlin.DataManager
 import kotlin.random.Random
 
@@ -102,14 +105,14 @@ class BlockerAccessibilityService : AccessibilityService() {
         instance = this // UI থেকে কল করার জন্য
 
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             flags = AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
             notificationTimeout = 100
         }
         this.serviceInfo = info
 
-        // 🔴 CRITICAL FIX: startForeground() এবং Notification রিমুভ করা হয়েছে।
+        // 🔴 CRITICAL FIX: startForeground() এবং Notification রিমুভ করা হয়েছে।
         // Android 12+ এ Accessibility Service এর জন্য ফোরগ্রাউন্ড পারমিশন ক্র্যাশ তৈরি করে।
     }
 
@@ -136,8 +139,38 @@ class BlockerAccessibilityService : AccessibilityService() {
         if (event == null || (!DataManager.isFocusActive && !DataManager.isAdultFocusActive && !isDeepStudyActive)) return
 
         val packageName = event.packageName?.toString() ?: return
-        var currentUrl = ""
-        var screenText = ""
+
+        // ==========================================
+        // ১. নতুন টাইপিং ফিল্টার লজিক (Select All + Clear)
+        // এই লজিক অ্যাপ মিনিমাইজ করবে না, শুধু টেক্সট মুছে দেবে
+        // ==========================================
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
+            val source = event.source
+            val typedText = event.text.joinToString(" ").lowercase()
+
+            if (DataManager.isAdultFocusActive && hardcoreKeywords.any { typedText.contains(it) }) {
+                source?.let { node ->
+                    // ১. পুরো টেক্সট সিলেক্ট করা (Select All এর কাজ)
+                    val selectArgs = android.os.Bundle()
+                    selectArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                    selectArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, typedText.length)
+                    node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selectArgs)
+
+                    // ২. সিলেক্টেড টেক্সট মুছে দেওয়া (Backspace এর কাজ)
+                    val clearArgs = android.os.Bundle()
+                    clearArgs.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                    node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
+                    
+                    // ৩. শুধু ওয়ার্নিং পপআপ দেখানো হবে, অ্যাপ মিনিমাইজ হবে না
+                    showWarningPopup("Warning: Inappropriate typing cleared!", true)
+                }
+                return // কাজ শেষ, নিচে আর যাবে না, তাই মিনিমাইজও হবে না!
+            }
+        }
+
+        // ==========================================
+        // ২. আগের লজিক (উইন্ডো চেঞ্জ এবং মিনিমাইজ)
+        // ==========================================
 
         // 24-Hour Lock & Periodic Popup Checker
         if (DataManager.is24HourLockActive) {
@@ -161,12 +194,13 @@ class BlockerAccessibilityService : AccessibilityService() {
             event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             
             val rootNode = rootInActiveWindow ?: return
+            var currentUrl = ""
             
             if (packageName.contains("chrome") || packageName.contains("browser") || packageName.contains("edge")) {
                 currentUrl = extractUrlFromBrowser(rootNode).lowercase()
             }
             
-            screenText = event.text.joinToString(" ").lowercase()
+            val screenText = event.text.joinToString(" ").lowercase()
             
             checkAndBlockContent(packageName, currentUrl, screenText)
             rootNode.recycle()
@@ -272,7 +306,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             // Deep Study Strict Logic
             if (isDeepStudyActive && DataManager.isDeepStudyStrict && !shouldBlock && !isSystemCriticalApp) {
-                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak
+                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak // Syncs with local variable
                 if (!pauseBlocking) {
                     val appAllowed = dsAllowApps.any { packageName.contains(it) }
                     val webAllowed = url.isNotEmpty() && dsAllowWebs.any { url.contains(it) }
@@ -291,7 +325,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerBlockAction(reason: String, isSecurityWarning: Boolean) {
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        performGlobalAction(GLOBAL_ACTION_HOME) // এই লাইনটি অ্যাপ মিনিমাইজ করে
         
         // Streak Penalty
         if (!isSecurityWarning && DataManager.isAdultFocusActive) { 
