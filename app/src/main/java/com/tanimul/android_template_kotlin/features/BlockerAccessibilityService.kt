@@ -5,7 +5,6 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
 import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -46,13 +45,15 @@ class BlockerAccessibilityService : AccessibilityService() {
         "youporn.com", "brazzers.com", "spankbang.com", "eporner.com", "chaturbate.com"
     )
 
-    // Religious & Motivational Quotes
+    // Religious Quotes (For Normal Blocks)
     private val muslimQuotesBn = listOf("মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে...", "লজ্জাশীলতা ঈমানের অঙ্গ।")
     private val muslimQuotesEn = listOf("Tell the believing men to reduce their vision...", "Modesty is a branch of faith.")
     private val hinduQuotesBn = listOf("যে মনকে নিয়ন্ত্রণ করতে পারে গঠন, তার মন তার সবচেয়ে বড় শত্রু।", "কাম, ক্রোধ এবং লোভ—এই তিনটি নরকের দ্বার।")
     private val hinduQuotesEn = listOf("For him who has conquered the mind, the mind is the best of friends.", "Lust, anger, and greed are the three doors to hell.")
     private val christianQuotesBn = listOf("খারাপ সাহচর্য ভালো চরিত্র নষ্ট করে।", "অহংকার পতনের মূল।")
     private val christianQuotesEn = listOf("Bad company ruins good morals.", "Pride goes before destruction.")
+    
+    // Motivational Quotes (For Deep Study / Pomodoro)
     private val motivationalQuotesBn = listOf(
         "সময়ের মূল্য বোঝো, জীবন তোমার মূল্য বুঝবে।",
         "সফলতা আসে ফোকাস থেকে, ডিস্ট্রাকশন থেকে নয়।",
@@ -84,7 +85,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     private var floatingTimerView: android.view.View? = null
     private var timerTextView: android.widget.TextView? = null
     private var breakScreenView: android.view.View? = null
-    private var sessionCompleteView: android.view.View? = null // 🟢 New Session Popup
+    private var sessionCompleteView: android.view.View? = null
 
     // Audio & Sound Synthesis Variables
     private var audioTrack: android.media.AudioTrack? = null
@@ -97,11 +98,11 @@ class BlockerAccessibilityService : AccessibilityService() {
     private var initialTouchX: Float = 0f
     private var initialTouchY: Float = 0f
 
-    // Session Recovery (Auto Save)
+    // Session Recovery
     private lateinit var recoveryPrefs: SharedPreferences
 
     // ==========================================
-    // STEP 1: Initialization & Auto Recovery
+    // STEP 1: Initialization
     // ==========================================
     override fun onCreate() {
         super.onCreate()
@@ -124,7 +125,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         // AUTO RECOVERY LOGIC
         val isSavedActive = recoveryPrefs.getBoolean("isTimerActive", false)
         val targetEndTime = recoveryPrefs.getLong("targetEndTime", 0L)
-        val sessionType = recoveryPrefs.getInt("sessionType", 0) // 0 = Focus, 1 = Break
+        val sessionType = recoveryPrefs.getInt("sessionType", 0) 
         val soundType = recoveryPrefs.getInt("soundType", 0)
         val playSound = recoveryPrefs.getBoolean("playSound", false)
 
@@ -141,18 +142,14 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        instance = null
-        return super.onUnbind(intent)
+        instance = null; return super.onUnbind(intent)
     }
-
     override fun onDestroy() {
-        super.onDestroy()
-        instance = null
-        stopAmbientSound()
+        super.onDestroy(); instance = null; stopAmbientSound()
     }
 
     // ==========================================
-    // 🟢 HELPER: SYSTEM APP CHECKER (For Strict Mode & Keyboard)
+    // HELPER: SYSTEM APP CHECKER
     // ==========================================
     private fun isSystemApp(packageName: String): Boolean {
         return packageName.contains("launcher") || 
@@ -175,12 +172,10 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: return
 
-        // ১. টাইপিং ফিল্টার লজিক (System Apps Ignored)
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val source = event.source
             val typedText = event.text.joinToString(" ").lowercase()
 
-            // 🟢 System App গুলোতে টাইপিং ফিল্টার ব্লক করবে না
             if (!isSystemApp(packageName) && DataManager.isAdultFocusActive && hardcoreKeywords.any { typedText.contains(it) }) {
                 source?.let { node ->
                     val selectArgs = android.os.Bundle()
@@ -192,13 +187,12 @@ class BlockerAccessibilityService : AccessibilityService() {
                     clearArgs.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
                     node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
                     
-                    showWarningPopup("Warning: Inappropriate typing cleared!", true)
+                    showWarningPopup("Warning: Inappropriate typing cleared!", true, isDeepStudyActive)
                 }
                 return
             }
         }
 
-        // 24-Hour Lock Checking
         if (DataManager.is24HourLockActive) {
             if (System.currentTimeMillis() >= DataManager.lock24hEndTime) {
                 DataManager.is24HourLockActive = false
@@ -208,7 +202,6 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        // ২. কন্টেন্ট এবং উইন্ডো চেকিং
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || 
             event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             
@@ -248,8 +241,10 @@ class BlockerAccessibilityService : AccessibilityService() {
         return ""
     }
 
+    // ==========================================
+    // 🟢 DEEP STUDY BLOCKING LOGIC (Motivational Quotes & Go Back)
+    // ==========================================
     private fun checkDeepStudyBlocking(packageName: String, url: String) {
-        // 🟢 System apps (Keyboard, Dialer, Messaging etc.) are ignored automatically
         if (isSystemApp(packageName)) return
 
         val allowedApps = DataManager.dsAllowAppList
@@ -261,11 +256,23 @@ class BlockerAccessibilityService : AccessibilityService() {
         val pauseDuringBreak = isDeepStudyBreak && !DataManager.dsKeepBlockingInBreak
 
         if (!isAppAllowed && !isWebAllowed && !pauseDuringBreak) {
-            performGlobalAction(GLOBAL_ACTION_HOME)
-            showWarningPopup("Deep Study Active! Stay Focused on your goals.", true)
+            // 🟢 Action: Try to Go Back (Close Tab), if fails go Home
+            val goBackSuccess = performGlobalAction(GLOBAL_ACTION_BACK)
+            if (!goBackSuccess) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+            
+            // 🟢 Show Motivational Quote instead of Warning/Hadith
+            val quoteList = if (DataManager.adultLanguage == 0) motivationalQuotesBn else motivationalQuotesEn
+            val randomQuote = quoteList[Random.nextInt(quoteList.size)]
+            
+            showWarningPopup(randomQuote, false, true) // isDeepStudyMode = true
         }
     }
 
+    // ==========================================
+    // NORMAL BLOCKING LOGIC (Hadith & Warnings)
+    // ==========================================
     private fun checkAndBlockContent(packageName: String, url: String, screenText: String) {
         var shouldBlock = false
         var isSecurityWarning = false
@@ -289,12 +296,6 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
             else if (url.contains("youtube.com/shorts") || url.contains("facebook.com/reel")) {
                 shouldBlock = true; isSecurityWarning = true; blockReason = "Shorts/Reels are blocked!"
-            }
-
-            if (!shouldBlock && DataManager.userCustomAdultKeywords.isNotEmpty()) {
-                if (DataManager.userCustomAdultKeywords.any { url.contains(it.lowercase()) || screenText.contains(it.lowercase()) }) {
-                    shouldBlock = true; isSecurityWarning = true; blockReason = "Blocked by custom keywords!"
-                }
             }
         }
 
@@ -321,16 +322,17 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
-        if (shouldBlock) triggerBlockAction(blockReason, isSecurityWarning)
-    }
-
-    private fun triggerBlockAction(reason: String, isSecurityWarning: Boolean) {
-        performGlobalAction(GLOBAL_ACTION_HOME) 
-        if (!isSecurityWarning && DataManager.isAdultFocusActive) { 
-            DataManager.totalBlockedCount++
-            DataManager.cleanStreakDays = 0 
+        if (shouldBlock) {
+            performGlobalAction(GLOBAL_ACTION_HOME) 
+            if (!isSecurityWarning && DataManager.isAdultFocusActive) { 
+                DataManager.totalBlockedCount++
+                DataManager.cleanStreakDays = 0 
+            }
+            
+            // 🟢 Show Hadith or Warning
+            val msg = if (isSecurityWarning || !DataManager.showQuotes) blockReason else getReligiousQuote()
+            showWarningPopup(msg, isSecurityWarning, false)
         }
-        showWarningPopup(if (isSecurityWarning || !DataManager.showQuotes) reason else getReligiousQuote(), isSecurityWarning)
     }
 
     private fun getReligiousQuote(): String {
@@ -359,17 +361,10 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun resumeDeepStudySession(timeMillis: Long, playSound: Boolean, soundType: Int) {
-        isDeepStudyActive = true
-        isDeepStudyBreak = false
+        isDeepStudyActive = true; isDeepStudyBreak = false
 
-        // SAVE TO PREFS (Auto Recovery)
-        recoveryPrefs.edit()
-            .putBoolean("isTimerActive", true)
-            .putLong("targetEndTime", System.currentTimeMillis() + timeMillis)
-            .putInt("sessionType", 0)
-            .putBoolean("playSound", playSound)
-            .putInt("soundType", soundType)
-            .apply()
+        recoveryPrefs.edit().putBoolean("isTimerActive", true).putLong("targetEndTime", System.currentTimeMillis() + timeMillis)
+            .putInt("sessionType", 0).putBoolean("playSound", playSound).putInt("soundType", soundType).apply()
 
         if (playSound) playAmbientSound(soundType)
         showFloatingTimer()
@@ -377,23 +372,14 @@ class BlockerAccessibilityService : AccessibilityService() {
         dsTimer?.cancel()
         dsTimer = object : android.os.CountDownTimer(timeMillis, 30) {
             override fun onTick(millisUntilFinished: Long) {
-                dsTimeLeftMillis = millisUntilFinished
-                updateFloatingTimerText(millisUntilFinished)
-                if (millisUntilFinished in 59000..60030) {
-                    showWarningPopup("⏳ Just 1 Minute Remaining! Keep Going!", false)
-                }
+                dsTimeLeftMillis = millisUntilFinished; updateFloatingTimerText(millisUntilFinished)
+                if (millisUntilFinished in 59000..60030) showWarningPopup("⏳ Just 1 Minute Remaining! Keep Going!", false, true)
             }
             override fun onFinish() {
-                stopAmbientSound()
-                removeFloatingTimer()
-                
-                // 🟢 Reset variables & Auto Update UI Button
-                isDeepStudyActive = false
-                DataManager.isDeepStudyStrict = false
+                stopAmbientSound(); removeFloatingTimer()
+                isDeepStudyActive = false; DataManager.isDeepStudyStrict = false
                 recoveryPrefs.edit().clear().apply()
-                sendBroadcast(Intent("POMODORO_SESSION_UPDATE")) // Signal for UI reset
-
-                // 🟢 Show the Interactive Completion Popup
+                sendBroadcast(Intent("POMODORO_SESSION_UPDATE"))
                 showSessionCompletePopup()
             }
         }.start()
@@ -404,28 +390,23 @@ class BlockerAccessibilityService : AccessibilityService() {
         val timeMillis = breakMinutes * 60 * 1000L
         showBreakScreenOverlay()
 
-        recoveryPrefs.edit()
-            .putBoolean("isTimerActive", true)
-            .putLong("targetEndTime", System.currentTimeMillis() + timeMillis)
-            .putInt("sessionType", 1)
-            .apply()
+        recoveryPrefs.edit().putBoolean("isTimerActive", true).putLong("targetEndTime", System.currentTimeMillis() + timeMillis).putInt("sessionType", 1).apply()
 
         dsTimer?.cancel()
         dsTimer = object : android.os.CountDownTimer(timeMillis, 1000) {
             override fun onTick(millisUntilFinished: Long) {}
             override fun onFinish() {
                 removeBreakScreenOverlay()
-                isDeepStudyActive = false
-                DataManager.isDeepStudyStrict = false
+                isDeepStudyActive = false; DataManager.isDeepStudyStrict = false
                 recoveryPrefs.edit().clear().apply() 
-                showWarningPopup("🎉 Break Completed! Ready to focus?", false)
+                showWarningPopup("🎉 Break Completed! Ready to focus?", false, true)
                 sendBroadcast(Intent("POMODORO_SESSION_UPDATE"))
             }
         }.start()
     }
 
     // ==========================================
-    // 🟢 NEW: SESSION COMPLETE INTERACTIVE POPUP
+    // SESSION COMPLETE INTERACTIVE POPUP
     // ==========================================
     private fun showSessionCompletePopup() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -434,70 +415,42 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
             val params = android.view.WindowManager.LayoutParams(
-                android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT
             )
 
             val layout = android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                setBackgroundColor(android.graphics.Color.parseColor("#E6000000")) // 90% Dark background
+                orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
+                setBackgroundColor(android.graphics.Color.parseColor("#E6000000"))
             }
 
-            // Central Card
             val card = android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                setPadding(60, 80, 60, 80)
-                val shape = android.graphics.drawable.GradientDrawable()
-                shape.cornerRadius = 40f
-                shape.setColor(android.graphics.Color.WHITE)
+                orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER; setPadding(60, 80, 60, 80)
+                val shape = android.graphics.drawable.GradientDrawable(); shape.cornerRadius = 40f; shape.setColor(android.graphics.Color.WHITE)
                 background = shape
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(80, 0, 80, 0) }
+                layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(80, 0, 80, 0) }
             }
 
             val title = android.widget.TextView(this).apply {
-                text = "SESSION COMPLETED! 🎉"
-                textSize = 22f
-                setTextColor(android.graphics.Color.parseColor("#0CA8B0"))
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, 0, 0, 60)
+                text = "SESSION COMPLETED! 🎉"; textSize = 22f; setTextColor(android.graphics.Color.parseColor("#0CA8B0"))
+                setTypeface(null, android.graphics.Typeface.BOLD); gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 60)
             }
 
             val btnRest = android.widget.Button(this).apply {
-                text = "Take a Rest (${DataManager.dsRestMin}m)"
-                setTextColor(android.graphics.Color.WHITE)
-                val btnShape = android.graphics.drawable.GradientDrawable()
-                btnShape.cornerRadius = 24f
-                btnShape.setColor(android.graphics.Color.parseColor("#10B981")) // Green
+                text = "Take a Rest (${DataManager.dsRestMin}m)"; setTextColor(android.graphics.Color.WHITE)
+                val btnShape = android.graphics.drawable.GradientDrawable(); btnShape.cornerRadius = 24f; btnShape.setColor(android.graphics.Color.parseColor("#10B981"))
                 background = btnShape
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140
-                ).apply { setMargins(0, 0, 0, 30) }
-                
-                setOnClickListener {
-                    removeSessionCompletePopup()
-                    startDeepStudyBreak(DataManager.dsRestMin)
-                }
+                layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140).apply { setMargins(0, 0, 0, 30) }
+                setOnClickListener { removeSessionCompletePopup(); startDeepStudyBreak(DataManager.dsRestMin) }
             }
 
             val btnStart = android.widget.Button(this).apply {
-                text = "Start Again (${DataManager.dsFocusMin}m)"
-                setTextColor(android.graphics.Color.WHITE)
-                val btnShape = android.graphics.drawable.GradientDrawable()
-                btnShape.cornerRadius = 24f
-                btnShape.setColor(android.graphics.Color.parseColor("#0CA8B0")) // Teal
+                text = "Start Again (${DataManager.dsFocusMin}m)"; setTextColor(android.graphics.Color.WHITE)
+                val btnShape = android.graphics.drawable.GradientDrawable(); btnShape.cornerRadius = 24f; btnShape.setColor(android.graphics.Color.parseColor("#0CA8B0"))
                 background = btnShape
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140
-                ).apply { setMargins(0, 0, 0, 30) }
-                
+                layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140).apply { setMargins(0, 0, 0, 30) }
                 setOnClickListener {
                     removeSessionCompletePopup()
                     val soundType = recoveryPrefs.getInt("soundType", 0)
@@ -507,27 +460,14 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
 
             val btnClose = android.widget.Button(this).apply {
-                text = "Close & Reset"
-                setTextColor(android.graphics.Color.WHITE)
-                val btnShape = android.graphics.drawable.GradientDrawable()
-                btnShape.cornerRadius = 24f
-                btnShape.setColor(android.graphics.Color.parseColor("#E74C3C")) // Red
+                text = "Close & Reset"; setTextColor(android.graphics.Color.WHITE)
+                val btnShape = android.graphics.drawable.GradientDrawable(); btnShape.cornerRadius = 24f; btnShape.setColor(android.graphics.Color.parseColor("#E74C3C"))
                 background = btnShape
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140
-                )
-                
-                setOnClickListener {
-                    removeSessionCompletePopup()
-                }
+                layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140)
+                setOnClickListener { removeSessionCompletePopup() }
             }
 
-            card.addView(title)
-            card.addView(btnRest)
-            card.addView(btnStart)
-            card.addView(btnClose)
-            layout.addView(card)
-            
+            card.addView(title); card.addView(btnRest); card.addView(btnStart); card.addView(btnClose); layout.addView(card)
             sessionCompleteView = layout
             try { windowManager?.addView(sessionCompleteView, params) } catch (e: Exception) {}
         }
@@ -541,7 +481,6 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
     }
 
-
     // ==========================================
     // SYNTHESIZED 10 TYPES OF AMBIENT SOUNDS
     // ==========================================
@@ -550,28 +489,15 @@ class BlockerAccessibilityService : AccessibilityService() {
         isPlayingNoise = true
 
         val sampleRate = 44100
-        val bufferSize = android.media.AudioTrack.getMinBufferSize(
-            sampleRate, android.media.AudioFormat.CHANNEL_OUT_MONO, android.media.AudioFormat.ENCODING_PCM_16BIT
-        )
-
-        audioTrack = android.media.AudioTrack(
-            android.media.AudioManager.STREAM_MUSIC, sampleRate,
-            android.media.AudioFormat.CHANNEL_OUT_MONO, android.media.AudioFormat.ENCODING_PCM_16BIT,
-            bufferSize, android.media.AudioTrack.MODE_STREAM
-        )
+        val bufferSize = android.media.AudioTrack.getMinBufferSize(sampleRate, android.media.AudioFormat.CHANNEL_OUT_MONO, android.media.AudioFormat.ENCODING_PCM_16BIT)
+        audioTrack = android.media.AudioTrack(android.media.AudioManager.STREAM_MUSIC, sampleRate, android.media.AudioFormat.CHANNEL_OUT_MONO, android.media.AudioFormat.ENCODING_PCM_16BIT, bufferSize, android.media.AudioTrack.MODE_STREAM)
         audioTrack?.play()
 
         noiseThread = Thread {
-            val buffer = ShortArray(bufferSize)
-            val random = java.util.Random()
-            var lastOut = 0.0
-            var phase = 0.0
-
+            val buffer = ShortArray(bufferSize); val random = java.util.Random(); var lastOut = 0.0; var phase = 0.0
             while (isPlayingNoise) {
                 for (i in buffer.indices) {
-                    val white = (random.nextDouble() * 2 - 1)
-                    var output = 0.0
-
+                    val white = (random.nextDouble() * 2 - 1); var output = 0.0
                     when (soundType) {
                         0 -> output = white * 0.1 
                         1 -> { lastOut = (lastOut + 0.02 * white) / 1.02; output = lastOut * 3.5 } 
@@ -585,9 +511,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                         9 -> { lastOut = (lastOut + 0.01 * white) / 1.01; phase += 0.0002; val throb = Math.sin(phase) * 0.3; output = lastOut * 3.5 * (0.7 + throb) } 
                         else -> { lastOut = (lastOut + 0.02 * white) / 1.02; output = lastOut * 3.5 }
                     }
-
-                    if (output > 1.0) output = 1.0
-                    if (output < -1.0) output = -1.0
+                    if (output > 1.0) output = 1.0; if (output < -1.0) output = -1.0
                     buffer[i] = (output * Short.MAX_VALUE).toInt().toShort()
                 }
                 audioTrack?.write(buffer, 0, buffer.size)
@@ -597,8 +521,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun stopAmbientSound() {
-        isPlayingNoise = false
-        try { noiseThread?.join(500) } catch (e: Exception) {}
+        isPlayingNoise = false; try { noiseThread?.join(500) } catch (e: Exception) {}
         audioTrack?.let { if (it.playState == android.media.AudioTrack.PLAYSTATE_PLAYING) it.stop(); it.release() }
         audioTrack = null
     }
@@ -610,51 +533,31 @@ class BlockerAccessibilityService : AccessibilityService() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
             if (floatingTimerView != null) return@post
-            
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
             val params = android.view.WindowManager.LayoutParams(
-                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
-                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                android.view.WindowManager.LayoutParams.WRAP_CONTENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 android.graphics.PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = android.view.Gravity.TOP or android.view.Gravity.START
-                x = 100; y = 200
-            }
+            ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.START; x = 100; y = 200 }
 
             val layout = android.widget.LinearLayout(this).apply {
                 setPadding(40, 20, 40, 20)
-                val shape = android.graphics.drawable.GradientDrawable()
-                shape.cornerRadius = 30f
-                shape.setColor(android.graphics.Color.parseColor("#0CA8B0"))
+                val shape = android.graphics.drawable.GradientDrawable(); shape.cornerRadius = 30f; shape.setColor(android.graphics.Color.parseColor("#0CA8B0"))
                 background = shape
-
                 setOnTouchListener { _, event ->
                     when (event.action) {
-                        android.view.MotionEvent.ACTION_DOWN -> {
-                            initialX = params.x; initialY = params.y
-                            initialTouchX = event.rawX; initialTouchY = event.rawY
-                            true
-                        }
-                        android.view.MotionEvent.ACTION_MOVE -> {
-                            params.x = initialX + (event.rawX - initialTouchX).toInt()
-                            params.y = initialY + (event.rawY - initialTouchY).toInt()
-                            windowManager?.updateViewLayout(this, params)
-                            true
-                        }
+                        android.view.MotionEvent.ACTION_DOWN -> { initialX = params.x; initialY = params.y; initialTouchX = event.rawX; initialTouchY = event.rawY; true }
+                        android.view.MotionEvent.ACTION_MOVE -> { params.x = initialX + (event.rawX - initialTouchX).toInt(); params.y = initialY + (event.rawY - initialTouchY).toInt(); windowManager?.updateViewLayout(this, params); true }
                         else -> false
                     }
                 }
             }
 
             timerTextView = android.widget.TextView(this).apply {
-                setTextColor(android.graphics.Color.WHITE); textSize = 22f
-                setTypeface(null, android.graphics.Typeface.BOLD); text = "00:00:00"
+                setTextColor(android.graphics.Color.WHITE); textSize = 22f; setTypeface(null, android.graphics.Typeface.BOLD); text = "00:00:00"
             }
-            layout.addView(timerTextView)
-            floatingTimerView = layout
-            
+            layout.addView(timerTextView); floatingTimerView = layout
             try { windowManager?.addView(floatingTimerView, params) } catch (e: Exception) {}
         }
     }
@@ -662,19 +565,14 @@ class BlockerAccessibilityService : AccessibilityService() {
     private fun updateFloatingTimerText(millis: Long) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
-            val mins = (millis / 1000) / 60
-            val secs = (millis / 1000) % 60
-            val ms = (millis % 1000) / 10 
+            val mins = (millis / 1000) / 60; val secs = (millis / 1000) % 60; val ms = (millis % 1000) / 10 
             timerTextView?.text = String.format("%02d:%02d:%02d", mins, secs, ms)
         }
     }
 
     private fun removeFloatingTimer() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        handler.post {
-            floatingTimerView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }
-            floatingTimerView = null
-        }
+        handler.post { floatingTimerView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }; floatingTimerView = null }
     }
 
     // ==========================================
@@ -684,83 +582,60 @@ class BlockerAccessibilityService : AccessibilityService() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
             if (breakScreenView != null) return@post
-
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
             val params = android.view.WindowManager.LayoutParams(
-                android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                android.view.WindowManager.LayoutParams.MATCH_PARENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.MATCH_PARENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT
             )
 
             val layout = android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                gravity = android.view.Gravity.CENTER
-                
-                val gradient = android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                    intArrayOf(android.graphics.Color.parseColor("#4A00E0"), android.graphics.Color.parseColor("#8E2DE2"))
-                )
+                orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
+                val gradient = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR, intArrayOf(android.graphics.Color.parseColor("#4A00E0"), android.graphics.Color.parseColor("#8E2DE2")))
                 background = gradient
             }
 
             val titleView = android.widget.TextView(this).apply {
-                text = "TAKE A BREAK!"
-                textSize = 45f; setTextColor(android.graphics.Color.WHITE) 
-                setTypeface(null, android.graphics.Typeface.BOLD)
+                text = "TAKE A BREAK!"; textSize = 45f; setTextColor(android.graphics.Color.WHITE); setTypeface(null, android.graphics.Typeface.BOLD)
                 setPadding(0, 0, 0, 30); gravity = android.view.Gravity.CENTER
             }
-            
             val subView = android.widget.TextView(this).apply {
-                text = "Breathe deep, rest your eyes, and relax your mind."
-                textSize = 18f; setTextColor(android.graphics.Color.parseColor("#E2E8F0"))
-                gravity = android.view.Gravity.CENTER
+                text = "Breathe deep, rest your eyes, and relax your mind."; textSize = 18f; setTextColor(android.graphics.Color.parseColor("#E2E8F0")); gravity = android.view.Gravity.CENTER
             }
-
-            layout.addView(titleView); layout.addView(subView)
-            breakScreenView = layout
-            
+            layout.addView(titleView); layout.addView(subView); breakScreenView = layout
             try { windowManager?.addView(breakScreenView, params) } catch (e: Exception) {}
         }
     }
 
     private fun removeBreakScreenOverlay() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        handler.post {
-            breakScreenView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }
-            breakScreenView = null
-        }
+        handler.post { breakScreenView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }; breakScreenView = null }
     }
 
     // ==========================================
-    // Crash-Free Fast Popup Overlay
+    // 🟢 UPDATED: Crash-Free Popup with Deep Study Mode Flag
     // ==========================================
-    private fun showWarningPopup(message: String, isSecurityWarning: Boolean) {
+    private fun showWarningPopup(message: String, isSecurityWarning: Boolean, isDeepStudyMode: Boolean) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
             removeWarningPopup()
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
             val layoutParams = android.view.WindowManager.LayoutParams(
-                android.view.WindowManager.LayoutParams.MATCH_PARENT,
-                android.view.WindowManager.LayoutParams.WRAP_CONTENT,
+                android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
                 android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 
                 android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 android.graphics.PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL
-                y = 150 
-            }
+            ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL; y = 150 }
 
             val linearLayout = android.widget.LinearLayout(this).apply {
                 orientation = android.widget.LinearLayout.VERTICAL
-                val bgColor = if (isSecurityWarning) "#E74C3C" else "#0CA8B0" 
-                setBackgroundColor(android.graphics.Color.parseColor(bgColor)) 
-                setPadding(50, 50, 50, 50)
+                val bgColor = if (isSecurityWarning) "#E74C3C" else if (isDeepStudyMode) "#4A00E0" else "#0CA8B0" 
+                setBackgroundColor(android.graphics.Color.parseColor(bgColor)); setPadding(50, 50, 50, 50)
             }
 
             val titleView = android.widget.TextView(this).apply {
-                text = if (isSecurityWarning) "ACCESS DENIED!" else "FOCUS ACTIVE!"
+                text = if (isSecurityWarning) "ACCESS DENIED!" else if (isDeepStudyMode) "STAY FOCUSED!" else "FOCUS ACTIVE!"
                 textSize = 20f; setTextColor(android.graphics.Color.WHITE)
                 setTypeface(null, android.graphics.Typeface.BOLD); gravity = android.view.Gravity.CENTER
             }
@@ -770,9 +645,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                 gravity = android.view.Gravity.CENTER; setPadding(0, 20, 0, 10)
             }
 
-            linearLayout.addView(titleView); linearLayout.addView(reasonView)
-            overlayView = linearLayout
-            
+            linearLayout.addView(titleView); linearLayout.addView(reasonView); overlayView = linearLayout
             try { windowManager?.addView(overlayView, layoutParams) } catch (e: Exception) {}
             handler.postDelayed({ removeWarningPopup() }, 5000) 
         }
