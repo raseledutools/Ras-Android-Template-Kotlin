@@ -1,8 +1,8 @@
 package com.tanimul.android_template_kotlin.features
 
+import android.widget.Toast
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -10,13 +10,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
 import java.util.*
+import com.tanimul.android_template_kotlin.DataManager
 
 // ==========================================
 // C++ Colors Translation
@@ -35,28 +36,32 @@ data class AdultCustomItem(val name: String)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Adult_block() {
+    val context = LocalContext.current
+
     // --- Sub Tab States ---
     var activeSubTab by remember { mutableIntStateOf(0) } // 0 = Safe Browsing, 1 = AI Filter, 2 = Strict Protocols
     
-    // --- State Variables ---
-    var isAdultFocusActive by remember { mutableStateOf(false) }
-    var cb24HourLock by remember { mutableStateOf(false) }
-    var controlMode by remember { mutableIntStateOf(0) } // 0: Self, 1: Friend
+    // --- DataManager Sync States ---
+    var isAdultFocusActive by remember { mutableStateOf(DataManager.isAdultFocusActive) }
+    var cb24HourLock by remember { mutableStateOf(DataManager.is24HourLockActive) }
+    var controlMode by remember { mutableIntStateOf(DataManager.controlMode) } // 0: Self, 1: Friend
     
-    var adultReligion by remember { mutableIntStateOf(0) } // 0: Muslim, 1: Hindu, 2: Christian, 3: Universal
-    var adultLanguage by remember { mutableIntStateOf(0) } // 0: Bangla, 1: English
+    var adultReligion by remember { mutableIntStateOf(DataManager.adultReligion) } // 0: Muslim, 1: Hindu, 2: Christian, 3: Universal
+    var adultLanguage by remember { mutableIntStateOf(DataManager.adultLanguage) } // 0: Bangla, 1: English
+    var cbPeriodicPopups by remember { mutableStateOf(DataManager.isPeriodicPopupsActive) }
     
-    // Checkboxes
+    // Checkboxes (Local UI states for now, core blocking checks isAdultFocusActive)
     var cbAdultWeb by remember { mutableStateOf(true) }
     var cbHardcore by remember { mutableStateOf(true) }
     var cbRomantic by remember { mutableStateOf(true) }
     var cbFbReels by remember { mutableStateOf(true) }
     var cbYtShorts by remember { mutableStateOf(true) }
-    var cbPeriodicPopups by remember { mutableStateOf(false) }
     
-    // Custom Keywords
+    // Custom Keywords Sync
     var customInputText by remember { mutableStateOf("") }
-    val customAdultKeywords = remember { mutableStateListOf<AdultCustomItem>() }
+    val customAdultKeywords = remember { mutableStateListOf<AdultCustomItem>().apply {
+        addAll(DataManager.userCustomAdultKeywords.map { AdultCustomItem(it) })
+    } }
     
     // Overlays
     var showTimeOverlay by remember { mutableStateOf(false) }
@@ -105,10 +110,15 @@ fun Adult_block() {
                     onClick = {
                         if (cb24HourLock) return@Button
                         if (isAdultFocusActive) {
-                            if (controlMode == 1) { isStoppingFocus = true; showPassOverlay = true }
-                            else { isAdultFocusActive = false }
+                            if (controlMode == 1) { 
+                                isStoppingFocus = true; showPassOverlay = true 
+                            } else { 
+                                isAdultFocusActive = false
+                                DataManager.isAdultFocusActive = false
+                            }
                         } else {
-                            if (controlMode == 0) showTimeOverlay = true else { isStoppingFocus = false; showPassOverlay = true }
+                            if (controlMode == 0) showTimeOverlay = true 
+                            else { isStoppingFocus = false; showPassOverlay = true }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = if (isAdultFocusActive) AClrRed else AClrGreen),
@@ -125,19 +135,28 @@ fun Adult_block() {
 
                 // --- 3 Dropdowns (Mode, Religion, Language) ---
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AdultDropdown("Mode", listOf("Self Control", "Friend Control"), controlMode, !isAdultFocusActive) { controlMode = it }
+                    AdultDropdown("Mode", listOf("Self Control", "Friend Control"), controlMode, !isAdultFocusActive) { 
+                        controlMode = it
+                        DataManager.controlMode = it
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Box(modifier = Modifier.weight(1f)) {
-                            AdultDropdown("Religion", listOf("Muslim", "Hindu", "Christian", "Universal"), adultReligion, !isAdultFocusActive) { adultReligion = it }
+                            AdultDropdown("Religion", listOf("Muslim", "Hindu", "Christian", "Universal"), adultReligion, !isAdultFocusActive) { 
+                                adultReligion = it
+                                DataManager.adultReligion = it 
+                            }
                         }
                         Box(modifier = Modifier.weight(1f)) {
-                            AdultDropdown("Lang", listOf("Bangla", "English"), adultLanguage, !isAdultFocusActive) { adultLanguage = it }
+                            AdultDropdown("Lang", listOf("Bangla", "English"), adultLanguage, !isAdultFocusActive) { 
+                                adultLanguage = it
+                                DataManager.adultLanguage = it 
+                            }
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = Color.LightGray)
+                HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // --- Block Checkboxes ---
@@ -161,7 +180,13 @@ fun Adult_block() {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
-                        onClick = { if (customInputText.isNotEmpty()) { customAdultKeywords.add(AdultCustomItem(customInputText)); customInputText = "" } },
+                        onClick = { 
+                            if (customInputText.isNotEmpty()) { 
+                                customAdultKeywords.add(AdultCustomItem(customInputText))
+                                DataManager.userCustomAdultKeywords = customAdultKeywords.map { it.name }
+                                customInputText = "" 
+                            } 
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = AClrTeal),
                         shape = RoundedCornerShape(8.dp), modifier = Modifier.height(56.dp), enabled = !isAdultFocusActive
                     ) { Text("+ Add") }
@@ -174,19 +199,22 @@ fun Adult_block() {
                             Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(item.name, color = AClrDark)
                                 if (!isAdultFocusActive) {
-                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = AClrRed, modifier = Modifier.clickable { customAdultKeywords.remove(item) })
+                                    Icon(Icons.Default.Close, contentDescription = "Delete", tint = AClrRed, modifier = Modifier.clickable { 
+                                        customAdultKeywords.remove(item)
+                                        DataManager.userCustomAdultKeywords = customAdultKeywords.map { it.name }
+                                    })
                                 }
                             }
-                            Divider(color = Color(0xFFEEEEEE))
+                            HorizontalDivider(color = Color(0xFFEEEEEE))
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                Divider(color = Color.LightGray)
+                HorizontalDivider(color = Color.LightGray)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // --- Clean Streak Card ---
+                // --- Clean Streak Card (Dynamic from DataManager) ---
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = AClrCardBg),
@@ -199,8 +227,8 @@ fun Adult_block() {
                         Column {
                             Text("Clean Streak", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = AClrDark)
                             Text(SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault()).format(Date()), fontSize = 12.sp, color = AClrGrayText)
-                            Text("12 Days", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = AClrTeal)
-                            Text("Keep up the great work!", fontSize = 12.sp, color = AClrGreen)
+                            Text("${DataManager.cleanStreakDays} Days", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = AClrTeal)
+                            Text(if (DataManager.cleanStreakDays > 0) "Keep up the great work!" else "Stay focused to build your streak!", fontSize = 12.sp, color = if(DataManager.cleanStreakDays > 0) AClrGreen else AClrRed)
                         }
                     }
                 }
@@ -213,7 +241,21 @@ fun Adult_block() {
                 
                 // 24 Hour Lock Checkbox with Subtext
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
-                    Checkbox(checked = cb24HourLock, onCheckedChange = { cb24HourLock = it }, enabled = !isAdultFocusActive, colors = CheckboxDefaults.colors(checkedColor = AClrTeal))
+                    Checkbox(
+                        checked = cb24HourLock, 
+                        onCheckedChange = { 
+                            cb24HourLock = it
+                            DataManager.is24HourLockActive = it
+                            if (it) {
+                                DataManager.lock24hEndTime = System.currentTimeMillis() + (24 * 60 * 60 * 1000L)
+                                isAdultFocusActive = true
+                                DataManager.isAdultFocusActive = true
+                                Toast.makeText(context, "24-Hour Lockdown Activated!", Toast.LENGTH_LONG).show()
+                            }
+                        }, 
+                        enabled = !isAdultFocusActive, 
+                        colors = CheckboxDefaults.colors(checkedColor = AClrTeal)
+                    )
                     Column(modifier = Modifier.padding(top = 12.dp)) {
                         Text("24-Hour Lockdown Mode", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AClrDark)
                         Text("Force Focus for 24h. Cannot be undone.", fontSize = 12.sp, color = AClrGrayText)
@@ -222,7 +264,15 @@ fun Adult_block() {
                 
                 // Periodic Popups
                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
-                    Checkbox(checked = cbPeriodicPopups, onCheckedChange = { cbPeriodicPopups = it }, enabled = !isAdultFocusActive, colors = CheckboxDefaults.colors(checkedColor = AClrTeal))
+                    Checkbox(
+                        checked = cbPeriodicPopups, 
+                        onCheckedChange = { 
+                            cbPeriodicPopups = it 
+                            DataManager.isPeriodicPopupsActive = it
+                        }, 
+                        enabled = !isAdultFocusActive, 
+                        colors = CheckboxDefaults.colors(checkedColor = AClrTeal)
+                    )
                     Column(modifier = Modifier.padding(top = 12.dp)) {
                         Text("Periodic Religious Popups", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AClrDark)
                         Text("Show fullscreen quotes every 25 mins.", fontSize = 12.sp, color = AClrGrayText)
@@ -239,13 +289,11 @@ fun Adult_block() {
             }
         } 
         else if (activeSubTab == 1) {
-            // AI Filter Tab Content
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("AI Filter Design Coming Soon...", color = AClrGrayText)
             }
         }
         else if (activeSubTab == 2) {
-            // Strict Protocols Tab Content
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("Strict Protocols Design Coming Soon...", color = AClrGrayText)
             }
@@ -270,7 +318,13 @@ fun Adult_block() {
                     Slider(value = mins.toFloat(), onValueChange = { mins = it.toInt() }, valueRange = 0f..59f)
                 }
             },
-            confirmButton = { Button(onClick = { isAdultFocusActive = true; showTimeOverlay = false }, colors = ButtonDefaults.buttonColors(AClrTeal)) { Text("Start Focus") } },
+            confirmButton = { 
+                Button(onClick = { 
+                    isAdultFocusActive = true
+                    DataManager.isAdultFocusActive = true
+                    showTimeOverlay = false 
+                }, colors = ButtonDefaults.buttonColors(AClrTeal)) { Text("Start Focus") } 
+            },
             dismissButton = { TextButton(onClick = { showTimeOverlay = false }) { Text("Cancel", color = AClrDark) } }
         )
     }
@@ -278,9 +332,33 @@ fun Adult_block() {
     if (showPassOverlay) {
         AlertDialog(
             onDismissRequest = { showPassOverlay = false },
-            title = { Text(if (isStoppingFocus) "ENTER PASSWORD TO STOP" else "ENTER FRIEND'S PASSWORD", fontWeight = FontWeight.Bold) },
+            title = { Text(if (isStoppingFocus) "ENTER FRIEND'S PASSWORD" else "SET PASSWORD TO START", fontWeight = FontWeight.Bold) },
             text = { OutlinedTextField(value = inputPassText, onValueChange = { inputPassText = it }, placeholder = { Text("Password...") }, singleLine = true) },
-            confirmButton = { Button(onClick = { isAdultFocusActive = !isStoppingFocus; showPassOverlay = false; inputPassText = "" }, colors = ButtonDefaults.buttonColors(AClrTeal)) { Text("Confirm") } },
+            confirmButton = { 
+                Button(onClick = { 
+                    if (isStoppingFocus) {
+                        val success = BlockerAccessibilityService.instance?.tryStopFocus(inputPassText) ?: false
+                        if (success) {
+                            isAdultFocusActive = false
+                            DataManager.isAdultFocusActive = false
+                            showPassOverlay = false
+                            inputPassText = ""
+                        } else {
+                            Toast.makeText(context, "Wrong Password or 24h Lock Active!", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        // স্টার্ট করার সময় (পাসওয়ার্ড '1234' সেট করা আছে সার্ভিসে ডামি হিসেবে)
+                        if(inputPassText == "1234") {
+                            isAdultFocusActive = true
+                            DataManager.isAdultFocusActive = true
+                            showPassOverlay = false
+                            inputPassText = ""
+                        } else {
+                            Toast.makeText(context, "Enter valid password to start (1234)", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }, colors = ButtonDefaults.buttonColors(AClrTeal)) { Text("Confirm") } 
+            },
             dismissButton = { TextButton(onClick = { showPassOverlay = false }) { Text("Cancel", color = AClrDark) } }
         )
     }
