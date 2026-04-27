@@ -11,9 +11,15 @@ import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.app.NotificationCompat
+import com.tanimul.android_template_kotlin.DataManager
 import kotlin.random.Random
 
 class BlockerAccessibilityService : AccessibilityService() {
+
+    companion object {
+        // UI থেকে সরাসরি সার্ভিসকে কল করার জন্য
+        var instance: BlockerAccessibilityService? = null
+    }
 
     // ==========================================
     // C++ Databases & Quotes
@@ -46,20 +52,16 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Religious & Motivational Quotes
     private val muslimQuotesBn = listOf("মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে...", "লজ্জাশীলতা ঈমানের অঙ্গ।")
     private val muslimQuotesEn = listOf("Tell the believing men to reduce their vision...", "Modesty is a branch of faith.")
-    
     private val hinduQuotesBn = listOf("যে মনকে নিয়ন্ত্রণ করতে পারে না, তার মন তার সবচেয়ে বড় শত্রু।", "কাম, ক্রোধ এবং লোভ—এই তিনটি নরকের দ্বার।")
     private val hinduQuotesEn = listOf("For him who has conquered the mind, the mind is the best of friends.", "Lust, anger, and greed are the three doors to hell.")
-    
     private val christianQuotesBn = listOf("খারাপ সাহচর্য ভালো চরিত্র নষ্ট করে।", "অহংকার পতনের মূল।")
     private val christianQuotesEn = listOf("Bad company ruins good morals.", "Pride goes before destruction.")
-
     private val motivationalQuotesBn = listOf(
         "সময়ের মূল্য বোঝো, জীবন তোমার মূল্য বুঝবে।",
         "সফলতা আসে ফোকাস থেকে, ডিস্ট্রাকশন থেকে নয়।",
         "আজকের সময় নষ্ট মানে, কালকের স্বপ্ন নষ্ট।",
         "যে নিজের মনকে নিয়ন্ত্রণ করতে পারে, সে পৃথিবী জয় করতে পারে।"
     )
-
     private val motivationalQuotesEn = listOf(
         "Understand the value of time, life will understand your value.",
         "Success comes from focus, not from distraction.",
@@ -68,41 +70,17 @@ class BlockerAccessibilityService : AccessibilityService() {
     )
 
     // ==========================================
-    // Dynamic User Variables (Will be synced with DataManager later)
+    // Service Private Engine States
     // ==========================================
-    private var isFocusActive = true 
-    private var isAdultFocusActive = true 
-    private var blockSettingsAndUninstall = true
-    
-    // Adult Block Preferences
-    private var controlMode = 0 // 0 = Self Control, 1 = Friend Control
-    private var friendControlPassword = "1234" 
-    private var adultReligion = 0 // 0 = Muslim, 1 = Hindu, 2 = Christian, 3 = Universal
-    private var adultLanguage = 0 // 0 = Bangla, 1 = English
-    private var showQuotes = true
-    private var userCustomAdultKeywords = mutableListOf<String>() 
-    
-    // Streaks & Lockdown
-    private var totalBlockedCount = 0
-    private var cleanStreakDays = 12
-    private var is24HourLockActive = false
-    private var lock24hEndTime: Long = 0
-    private var isPeriodicPopupsActive = false
     private var lastPeriodicPopupTime: Long = System.currentTimeMillis()
-
-    // Simple Blocks Preferences
-    private var simpleBlockMode = 1 // 0 = Allow Mode (White-list), 1 = Block Mode (Black-list)
-    private var userWebList = mutableListOf("facebook.com", "tiktok", "instagram") 
-    private var userAppList = mutableListOf("com.whatsapp", "com.facebook.katana") 
-
-    // Deep Study (Pomodoro) Variables
+    
+    // Deep Study (Pomodoro) Engine Variables
     private var isDeepStudyActive = false
     private var isDeepStudyBreak = false
-    private var dsKeepBlockingInBreak = false 
     private var dsAllowApps = mutableListOf("com.android.chrome", "com.google.android.youtube")
     private var dsAllowWebs = mutableListOf("wikipedia.org")
 
-    // Engine States
+    // Overlays & Timers
     private var windowManager: android.view.WindowManager? = null
     private var overlayView: android.view.View? = null
     private var dsTimer: android.os.CountDownTimer? = null
@@ -117,7 +95,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     // ==========================================
     override fun onServiceConnected() {
         super.onServiceConnected()
-        
+        instance = this // UI থেকে কল করার জন্য
+        DataManager.init(this) // DataManager চালু করা হলো
+
         val info = AccessibilityServiceInfo().apply {
             eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
@@ -151,6 +131,16 @@ class BlockerAccessibilityService : AccessibilityService() {
         startForeground(1001, notification)
     }
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        instance = null
+        return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        instance = null
+    }
+
     fun getInstalledApps(context: Context): List<String> {
         val pm = context.packageManager
         val packages = pm.getInstalledApplications(PackageManager.GET_META_DATA)
@@ -161,23 +151,23 @@ class BlockerAccessibilityService : AccessibilityService() {
     // STEP 2: Core Brain - Reading Screen & URL
     // ==========================================
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || !isFocusActive) return
+        if (event == null || (!DataManager.isFocusActive && !DataManager.isAdultFocusActive && !isDeepStudyActive)) return
 
         val packageName = event.packageName?.toString() ?: return
         var currentUrl = ""
         var screenText = ""
 
         // 24-Hour Lock & Periodic Popup Checker
-        if (is24HourLockActive) {
-            if (System.currentTimeMillis() >= lock24hEndTime) {
-                is24HourLockActive = false
-                isAdultFocusActive = false 
+        if (DataManager.is24HourLockActive) {
+            if (System.currentTimeMillis() >= DataManager.lock24hEndTime) {
+                DataManager.is24HourLockActive = false
+                DataManager.isAdultFocusActive = false 
             } else {
-                isAdultFocusActive = true 
+                DataManager.isAdultFocusActive = true 
             }
         }
 
-        if (isPeriodicPopupsActive && isAdultFocusActive) {
+        if (DataManager.isPeriodicPopupsActive && DataManager.isAdultFocusActive) {
             val timePassed = System.currentTimeMillis() - lastPeriodicPopupTime
             if (timePassed >= 25 * 60 * 1000) { 
                 showWarningPopup(getReligiousQuote(), false) 
@@ -221,7 +211,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // STEP 3: Advanced Filtering Logic
+    // STEP 3: Advanced Filtering Logic (Syncs with DataManager)
     // ==========================================
     private fun checkAndBlockContent(packageName: String, url: String, screenText: String) {
         var shouldBlock = false
@@ -229,7 +219,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         var blockReason = ""
 
         // ১. Strict Protection (Settings / Uninstall Block)
-        if (blockSettingsAndUninstall) {
+        if (DataManager.blockSettingsAndUninstall) {
             if (packageName.contains("com.android.settings") || packageName.contains("packageinstaller")) {
                 shouldBlock = true
                 isSecurityWarning = true
@@ -238,7 +228,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
 
         // ২. Adult & Hardcore Checking
-        if (isAdultFocusActive && !shouldBlock) {
+        if (DataManager.isAdultFocusActive && !shouldBlock) {
             if (adultWebsites.any { url.contains(it) }) {
                 shouldBlock = true; isSecurityWarning = true; blockReason = "Adult website detected!"
             }
@@ -256,16 +246,16 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
 
             // Custom Adult Keywords
-            if (!shouldBlock && userCustomAdultKeywords.isNotEmpty()) {
-                if (userCustomAdultKeywords.any { url.contains(it.lowercase()) || screenText.contains(it.lowercase()) }) {
+            if (!shouldBlock && DataManager.userCustomAdultKeywords.isNotEmpty()) {
+                if (DataManager.userCustomAdultKeywords.any { url.contains(it.lowercase()) || screenText.contains(it.lowercase()) }) {
                     shouldBlock = true; isSecurityWarning = true; blockReason = "Blocked by your custom keywords!"
                 }
             }
         }
 
         // ৩. Simple Blocks Website Checking
-        if (!shouldBlock && url.isNotEmpty()) {
-            for (web in userWebList) {
+        if (DataManager.isFocusActive && !shouldBlock && url.isNotEmpty()) {
+            for (web in DataManager.userWebList) {
                 val coreName = if (web.contains(".")) web.substringBefore(".") else web
                 if (coreName.length > 2 && url.contains(coreName)) {
                     shouldBlock = true
@@ -285,20 +275,22 @@ class BlockerAccessibilityService : AccessibilityService() {
                                       packageName.contains("mms") || 
                                       packageName == "com.tanimul.android_template_kotlin"
 
-            // Simple Blocks
-            if (simpleBlockMode == 1) { 
-                if (userAppList.any { packageName.contains(it) }) {
-                    shouldBlock = true; blockReason = "This app is in your blocklist."
-                }
-            } else if (simpleBlockMode == 0) { 
-                if (!isSystemCriticalApp && !userAppList.any { packageName.contains(it) }) {
-                    shouldBlock = true; blockReason = "Focus is Active. Only allowed apps can run."
+            // Simple Blocks Apps
+            if (DataManager.isFocusActive) {
+                if (DataManager.simpleBlockMode == 1) { 
+                    if (DataManager.userAppList.any { packageName.contains(it) }) {
+                        shouldBlock = true; blockReason = "This app is in your blocklist."
+                    }
+                } else if (DataManager.simpleBlockMode == 0) { 
+                    if (!isSystemCriticalApp && !DataManager.userAppList.any { packageName.contains(it) }) {
+                        shouldBlock = true; blockReason = "Focus is Active. Only allowed apps can run."
+                    }
                 }
             }
 
             // Deep Study Strict Logic
-            if (isDeepStudyActive && !shouldBlock && !isSystemCriticalApp) {
-                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak
+            if (isDeepStudyActive && DataManager.isDeepStudyStrict && !shouldBlock && !isSystemCriticalApp) {
+                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak // TODO: Add KeepBlockingInBreak to DataManager later if needed
                 if (!pauseBlocking) {
                     val appAllowed = dsAllowApps.any { packageName.contains(it) }
                     val webAllowed = url.isNotEmpty() && dsAllowWebs.any { url.contains(it) }
@@ -320,21 +312,21 @@ class BlockerAccessibilityService : AccessibilityService() {
         performGlobalAction(GLOBAL_ACTION_HOME)
         
         // Streak Penalty
-        if (!isSecurityWarning) { 
-            totalBlockedCount++
-            cleanStreakDays = 0 
+        if (!isSecurityWarning && DataManager.isAdultFocusActive) { 
+            DataManager.totalBlockedCount++
+            DataManager.cleanStreakDays = 0 
         }
 
-        val displayMessage = if (isSecurityWarning || !showQuotes) reason else getReligiousQuote()
+        val displayMessage = if (isSecurityWarning || !DataManager.showQuotes) reason else getReligiousQuote()
         showWarningPopup(displayMessage, isSecurityWarning)
     }
 
     private fun getReligiousQuote(): String {
-        val quotesList = when (adultReligion) {
-            0 -> if (adultLanguage == 0) muslimQuotesBn else muslimQuotesEn
-            1 -> if (adultLanguage == 0) hinduQuotesBn else hinduQuotesEn
-            2 -> if (adultLanguage == 0) christianQuotesBn else christianQuotesEn
-            else -> if (adultLanguage == 0) motivationalQuotesBn else motivationalQuotesEn 
+        val quotesList = when (DataManager.adultReligion) {
+            0 -> if (DataManager.adultLanguage == 0) muslimQuotesBn else muslimQuotesEn
+            1 -> if (DataManager.adultLanguage == 0) hinduQuotesBn else hinduQuotesEn
+            2 -> if (DataManager.adultLanguage == 0) christianQuotesBn else christianQuotesEn
+            else -> if (DataManager.adultLanguage == 0) motivationalQuotesBn else motivationalQuotesEn 
         }
         return quotesList[Random.nextInt(quotesList.size)]
     }
@@ -343,14 +335,14 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Friend Control Validation
     // ==========================================
     fun tryStopFocus(inputPassword: String): Boolean {
-        if (is24HourLockActive) return false 
+        if (DataManager.is24HourLockActive) return false 
 
-        return if (controlMode == 1) { 
+        return if (DataManager.controlMode == 1) { 
             if (inputPassword == friendControlPassword) {
-                isAdultFocusActive = false; true 
+                DataManager.isAdultFocusActive = false; true 
             } else false 
         } else { 
-            isAdultFocusActive = false; true 
+            DataManager.isAdultFocusActive = false; true 
         }
     }
 
@@ -394,6 +386,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             override fun onFinish() {
                 removeBreakScreenOverlay()
                 isDeepStudyActive = false
+                DataManager.isDeepStudyStrict = false
                 showWarningPopup("🎉 Session Completed Successfully!", false)
             }
         }.start()
