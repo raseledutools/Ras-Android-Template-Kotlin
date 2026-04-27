@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -20,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
-// 'private' অ্যাড করা হয়েছে যাতে অন্য ফাইলের সাথে কনফ্লিক্ট না করে
+// কালার প্যালেট
 private val ColTeal = Color(0xFF0CA8B0)         
-private val ColBgContent = Color(0xFFF8FAFC)    
+private val ColBgContent = Color(0xFFF1F5F9)    
 
 @Composable
 fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
@@ -34,54 +35,87 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
             .background(ColBgContent)
     ) {
         // ==========================================
-        // ১. টপবার এবং ৩-লাইনের মেনু (Hamburger)
+        // ১. থিম কালার হেডার (Full Width & Teal)
         // ==========================================
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp, start = 16.dp, end = 16.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .background(ColTeal) // হেডার আপনার থিম কালারের হবে
+                .padding(top = 48.dp, bottom = 24.dp) // স্ট্যাটাস বারের জন্য টপ প্যাডিং
         ) {
-            IconButton(onClick = onOpenDrawer) {
-                Icon(
-                    imageVector = Icons.Default.Menu, 
-                    contentDescription = "Menu", 
-                    tint = Color(0xFF323232), 
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Dashboard", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color(0xFF323232))
-        }
-
-        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-            // ওয়েলকাম মেসেজ
-            Text("Welcome back! Your productivity control center is ready.", color = Color.Gray, fontSize = 14.sp)
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ==========================================
-            // ২. টিয়াল (Teal) কালারের বড় ব্যানার
-            // ==========================================
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(ColTeal)
-                    .padding(24.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // হ্যামবার্গার মেনু আইকন
+                IconButton(
+                    onClick = onOpenDrawer,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f)) // হালকা সাদা ব্যাকগ্রাউন্ড
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu, 
+                        contentDescription = "Menu", 
+                        tint = Color.White, 
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                
                 Column {
-                    Text("Ready for Deep Work?", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Start an instant blocking session to eliminate all distractions.", fontSize = 14.sp, color = Color(0xFFD0F0F0))
+                    Text("Dashboard", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text("Ready for deep work?", fontSize = 14.sp, color = Color.White.copy(alpha = 0.8f))
+                }
+            }
+        }
+
+        // ==========================================
+        // মেইন বডি কন্টেন্ট
+        // ==========================================
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            
+            // একটু নেগেটিভ মার্জিন দিয়ে ব্যানারটাকে হেডারের ওপরে তুলে দেওয়া হলো
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ==========================================
+            // ২. স্ট্যাটাস/ইনফো ব্যানার
+            // ==========================================
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(ColTeal.copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Bolt, contentDescription = null, tint = ColTeal)
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text("Instant Session", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+                            Text("Eliminate all distractions now", fontSize = 13.sp, color = Color.Gray)
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(20.dp))
                     
                     Button(
                         onClick = { Toast.makeText(context, "Easy Session coming soon!", Toast.LENGTH_SHORT).show() },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.height(45.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = ColTeal),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(50.dp)
                     ) {
-                        Text("Start Easy Session", color = ColTeal, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Start Easy Session", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
@@ -91,7 +125,7 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
             // ==========================================
             // ৩. কুইক অ্যাকশন এবং সেটআপ কার্ড
             // ==========================================
-            Text("Quick Actions & Setup", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF323232))
+            Text("Control Center", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = Color(0xFF1E293B))
             Spacer(modifier = Modifier.height(16.dp))
 
             // প্রথম সারি
@@ -99,53 +133,53 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                QuickActionCard("App & Web Blocks", "Manage your blocklist", Icons.Default.Shield, Modifier.weight(1f)) {
+                QuickActionCard("App & Web Blocks", "Manage blocklist", Icons.Default.Shield, Modifier.weight(1f)) {
                     navController.navigate("blocks") 
                 }
-                QuickActionCard("Adult Filter", "Safe browsing setup", Icons.Default.Lock, Modifier.weight(1f)) {
+                QuickActionCard("Adult Filter", "Safe browsing", Icons.Default.Lock, Modifier.weight(1f)) {
                     navController.navigate("adult_block") 
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // দ্বিতীয় সারি (এখন এগুলোও সরাসরি নেভিগেট করবে)
+            // দ্বিতীয় সারি
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                QuickActionCard("Deep Study", "Pomodoro & focus", Icons.Default.Visibility, Modifier.weight(1f)) {
-                    navController.navigate("deep_study") // আপডেট করা হয়েছে
+                QuickActionCard("Deep Study", "Pomodoro timer", Icons.Default.Visibility, Modifier.weight(1f)) {
+                    navController.navigate("deep_study") 
                 }
-                QuickActionCard("Statistics", "View your progress", Icons.Default.BarChart, Modifier.weight(1f)) {
-                    navController.navigate("statistics") // আপডেট করা হয়েছে
+                QuickActionCard("Statistics", "View progress", Icons.Default.BarChart, Modifier.weight(1f)) {
+                    navController.navigate("statistics") 
                 }
             }
         }
     }
 }
 
-// কার্ডের ডিজাইন ফাংশন (যাতে কোড দেখতে পরিষ্কার লাগে)
+// ==========================================
+// রি-ডিজাইন করা কার্ড ফাংশন
+// ==========================================
 @Composable
 fun QuickActionCard(title: String, subtitle: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
     Card(
         modifier = modifier
             .clickable { onClick() }
-            .height(100.dp), 
+            .height(110.dp), 
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(16.dp).fillMaxSize(),
             verticalArrangement = Arrangement.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, contentDescription = null, tint = ColTeal, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF323232))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
+            Icon(icon, contentDescription = null, tint = ColTeal, modifier = Modifier.size(28.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color(0xFF1E293B), maxLines = 1)
+            Spacer(modifier = Modifier.height(2.dp))
             Text(subtitle, fontSize = 12.sp, color = Color.Gray, maxLines = 1)
         }
     }
