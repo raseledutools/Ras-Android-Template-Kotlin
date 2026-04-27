@@ -78,6 +78,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     // ==========================================
     private var lastPeriodicPopupTime: Long = System.currentTimeMillis()
     
+    // 🟢 Cooldown timer to prevent infinite block loops
+    private var lastAdultBlockTime: Long = 0
+    
     private var isDeepStudyActive = false
     private var isDeepStudyBreak = false
     
@@ -336,6 +339,10 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun triggerAdultBlockAction(packageName: String) {
+        // 🟢 Prevent infinite loop: 4 seconds cooldown between adult blocks
+        if (System.currentTimeMillis() - lastAdultBlockTime < 4000) return
+        lastAdultBlockTime = System.currentTimeMillis()
+
         val isBrowser = packageName.contains("chrome") || packageName.contains("browser") || 
                         packageName.contains("edge") || packageName.contains("firefox")
         
@@ -427,17 +434,12 @@ class BlockerAccessibilityService : AccessibilityService() {
         }.start()
     }
 
-    // ==========================================
-    // 🟢 FIXED: SESSION COMPLETE POPUP (Touch Enabled)
-    // ==========================================
     private fun showSessionCompletePopup() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
             if (sessionCompleteView != null) return@post
 
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            
-            // 🟢 Removed FLAG_NOT_FOCUSABLE, added FLAG_WATCH_OUTSIDE_TOUCH for reliable touch
             val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.MATCH_PARENT, 
                 android.view.WindowManager.LayoutParams.MATCH_PARENT,
@@ -473,7 +475,6 @@ class BlockerAccessibilityService : AccessibilityService() {
                 background = btnShape
                 layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 140).apply { setMargins(0, 0, 0, 30) }
                 
-                // 🟢 Added Touch Listener for reliability
                 setOnTouchListener { _, event ->
                     if (event.action == MotionEvent.ACTION_UP) {
                         removeSessionCompletePopup()
@@ -654,7 +655,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // 🟢 FIXED: FULL SCREEN HADITH POPUP (Touch Enabled)
+    // 🟢 NEW: 3 SECONDS AUTO CLOSE & RELIABLE TOUCH
     // ==========================================
     private fun showFullScreenHadithPopup(message: String) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -662,7 +663,6 @@ class BlockerAccessibilityService : AccessibilityService() {
             removeFullScreenHadithPopup() 
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
             
-            // 🟢 Reliable layout params for receiving touch
             val windowParams = android.view.WindowManager.LayoutParams(
                 android.view.WindowManager.LayoutParams.MATCH_PARENT, 
                 android.view.WindowManager.LayoutParams.MATCH_PARENT,
@@ -700,7 +700,6 @@ class BlockerAccessibilityService : AccessibilityService() {
                 background = btnShape
                 layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 150)
                 
-                // 🟢 Added Touch Listener for reliability
                 setOnTouchListener { _, event ->
                     if (event.action == MotionEvent.ACTION_UP) {
                         removeFullScreenHadithPopup()
@@ -712,6 +711,11 @@ class BlockerAccessibilityService : AccessibilityService() {
             layout.addView(iconView); layout.addView(titleView); layout.addView(reasonView); layout.addView(btnClose)
             fullScreenHadithView = layout
             try { windowManager?.addView(fullScreenHadithView, windowParams) } catch (e: Exception) {}
+            
+            // 🟢 Auto close the Full Screen block after 3 seconds
+            handler.postDelayed({
+                removeFullScreenHadithPopup()
+            }, 3000)
         }
     }
 
@@ -723,6 +727,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
     }
 
+    // ==========================================
+    // Crash-Free Fast Popup Overlay (Standard)
+    // ==========================================
     private fun showWarningPopup(message: String, isSecurityWarning: Boolean, isDeepStudyMode: Boolean) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
@@ -754,7 +761,9 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             linearLayout.addView(titleView); linearLayout.addView(reasonView); overlayView = linearLayout
             try { windowManager?.addView(overlayView, windowParams) } catch (e: Exception) {}
-            handler.postDelayed({ removeWarningPopup() }, 5000) 
+            
+            // 🟢 Normal warning popup also disappears after 3 seconds
+            handler.postDelayed({ removeWarningPopup() }, 3000) 
         }
     }
 
