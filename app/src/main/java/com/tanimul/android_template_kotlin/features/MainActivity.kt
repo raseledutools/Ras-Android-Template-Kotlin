@@ -62,57 +62,6 @@ class MainActivity : ComponentActivity() {
 // ==========================================
 // ১. মূল নেভিগেশন কন্ট্রোল
 // ==========================================
-@Composable
-fun AppRootNavigation() {
-    val navController = rememberNavController()
-    val context = LocalContext.current
-
-    NavHost(navController = navController, startDestination = "splash") {
-        // ১ সেকেন্ডের স্প্ল্যাশ স্ক্রিন
-        composable("splash") {
-            SplashScreen {
-                // পারমিশন চেক করে গন্তব্য ঠিক করা
-                val nextDest = if (areAllPermissionsGranted(context)) "main_app" else "permissions"
-                navController.navigate(nextDest) {
-                    popUpTo("splash") { inclusive = true }
-                }
-            }
-        }
-
-        // পারমিশন পেজ
-        composable("permissions") {
-            PermissionsPage {
-                navController.navigate("main_app") {
-                    popUpTo("permissions") { inclusive = true }
-                }
-            }
-        }
-
-        // মেইন অ্যাপ (ড্যাশবোর্ড + সাইডবার)
-        composable("main_app") {
-            RasFocusMainContent()
-        }
-    }
-}
-
-// ==========================================
-// ২. সুপার ফাস্ট স্প্ল্যাশ (১ সেকেন্ড)
-// ==========================================
-@Composable
-fun SplashScreen(onFinished: () -> Unit) {
-    LaunchedEffect(Unit) {
-        delay(1000) // মাত্র ১ সেকেন্ড
-        onFinished()
-    }
-
-    Box(modifier = Modifier.fillMaxSize().background(ColTeal), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.GpsFixed, null, tint = Color.White, modifier = Modifier.size(80.dp))
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("RasFocus Pro", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        }
-    }
-}
 
 // ==========================================
 // ৩. পারমিশন পেজ (ডিজাইন + লজিক)
