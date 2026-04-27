@@ -20,8 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
-val ColTeal = Color(0xFF0CA8B0)         
-val ColBgContent = Color(0xFFF8FAFC)    
+// 'private' অ্যাড করা হয়েছে যাতে অন্য ফাইলের সাথে কনফ্লিক্ট না করে
+private val ColTeal = Color(0xFF0CA8B0)         
+private val ColBgContent = Color(0xFFF8FAFC)    
 
 @Composable
 fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
@@ -114,10 +115,10 @@ fun MainScreen(navController: NavController, onOpenDrawer: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 QuickActionCard("Deep Study", "Pomodoro & focus", Icons.Default.Visibility, Modifier.weight(1f)) {
-                    navController.navigate("deep_study") // আপডেট করা হয়েছে
+                    navController.navigate("deep_study") // আপডেট করা হয়েছে
                 }
                 QuickActionCard("Statistics", "View your progress", Icons.Default.BarChart, Modifier.weight(1f)) {
-                    navController.navigate("statistics") // আপডেট করা হয়েছে
+                    navController.navigate("statistics") // আপডেট করা হয়েছে
                 }
             }
         }
