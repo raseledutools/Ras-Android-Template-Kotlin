@@ -73,10 +73,12 @@ class BlockerAccessibilityService : AccessibilityService() {
     // Service Private Engine States
     // ==========================================
     private var lastPeriodicPopupTime: Long = System.currentTimeMillis()
+    private var friendControlPassword = "1234" // <-- Missing variable fixed
     
     // Deep Study (Pomodoro) Engine Variables
     private var isDeepStudyActive = false
     private var isDeepStudyBreak = false
+    private var dsKeepBlockingInBreak = false // <-- Missing variable fixed
     private var dsAllowApps = mutableListOf("com.android.chrome", "com.google.android.youtube")
     private var dsAllowWebs = mutableListOf("wikipedia.org")
 
@@ -290,7 +292,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             // Deep Study Strict Logic
             if (isDeepStudyActive && DataManager.isDeepStudyStrict && !shouldBlock && !isSystemCriticalApp) {
-                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak // TODO: Add KeepBlockingInBreak to DataManager later if needed
+                val pauseBlocking = isDeepStudyBreak && !dsKeepBlockingInBreak // Syncs with local variable
                 if (!pauseBlocking) {
                     val appAllowed = dsAllowApps.any { packageName.contains(it) }
                     val webAllowed = url.isNotEmpty() && dsAllowWebs.any { url.contains(it) }
