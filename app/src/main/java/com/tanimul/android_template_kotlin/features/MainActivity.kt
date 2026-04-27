@@ -412,25 +412,3 @@ fun AnalyticsCard(title: String, value: String, subtitle: String, icon: ImageVec
         }
     }
 }
-
-// ==========================================
-// বটম নেভিগেশন আইটেম ডিজাইন
-// ==========================================
-@Composable
-fun BottomNavItem(label: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable { onClick() }.padding(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(if (isSelected) ColTealLight else Color.Transparent, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = label, tint = if (isSelected) ColTeal else Color.Gray)
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(label, fontSize = 10.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, color = if (isSelected) ColTeal else Color.Gray)
-    }
-}
