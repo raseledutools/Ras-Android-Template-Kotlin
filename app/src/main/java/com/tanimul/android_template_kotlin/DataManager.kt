@@ -12,23 +12,19 @@ object DataManager {
     }
 
     // ==========================================
-    // 🔴 CRITICAL FIX: সবগুলো ডিফল্ট ভ্যালু false করা হয়েছে
+    // 🔴 CORE TOGGLES (Default: false)
     // ==========================================
     var isFocusActive: Boolean
-        get() = prefs.getBoolean("isFocusActive", false) // ডিফল্ট: অফ
+        get() = prefs.getBoolean("isFocusActive", false)
         set(value) = prefs.edit().putBoolean("isFocusActive", value).apply()
 
     var isAdultFocusActive: Boolean
-        get() = prefs.getBoolean("isAdultFocusActive", false) // ডিফল্ট: অফ
+        get() = prefs.getBoolean("isAdultFocusActive", false)
         set(value) = prefs.edit().putBoolean("isAdultFocusActive", value).apply()
 
     var blockSettingsAndUninstall: Boolean
-        get() = prefs.getBoolean("blockSettingsAndUninstall", false) // ডিফল্ট: অফ
+        get() = prefs.getBoolean("blockSettingsAndUninstall", false)
         set(value) = prefs.edit().putBoolean("blockSettingsAndUninstall", value).apply()
-
-    var isDeepStudyStrict: Boolean
-        get() = prefs.getBoolean("isDeepStudyStrict", false)
-        set(value) = prefs.edit().putBoolean("isDeepStudyStrict", value).apply()
 
     var is24HourLockActive: Boolean
         get() = prefs.getBoolean("is24HourLockActive", false)
@@ -37,6 +33,29 @@ object DataManager {
     var isPeriodicPopupsActive: Boolean
         get() = prefs.getBoolean("isPeriodicPopupsActive", false)
         set(value) = prefs.edit().putBoolean("isPeriodicPopupsActive", value).apply()
+
+    // ==========================================
+    // 🔵 DEEP STUDY SPECIFIC SETTINGS
+    // ==========================================
+    var isDeepStudyStrict: Boolean
+        get() = prefs.getBoolean("isDeepStudyStrict", false)
+        set(value) = prefs.edit().putBoolean("isDeepStudyStrict", value).apply()
+
+    var dsFocusMin: Int
+        get() = prefs.getInt("dsFocusMin", 25) // ডিফল্ট ২৫ মিনিট
+        set(value) = prefs.edit().putInt("dsFocusMin", value).apply()
+
+    var dsRestMin: Int
+        get() = prefs.getInt("dsRestMin", 5) // ডিফল্ট ৫ মিনিট
+        set(value) = prefs.edit().putInt("dsRestMin", value).apply()
+
+    var dsTotalSessions: Int
+        get() = prefs.getInt("dsTotalSessions", 4) // ডিফল্ট ৪ সেশন
+        set(value) = prefs.edit().putInt("dsTotalSessions", value).apply()
+
+    var dsKeepBlockingInBreak: Boolean
+        get() = prefs.getBoolean("dsKeepBlockingInBreak", false)
+        set(value) = prefs.edit().putBoolean("dsKeepBlockingInBreak", value).apply()
 
     // ==========================================
     // Others Data & Settings
@@ -70,21 +89,31 @@ object DataManager {
         set(value) = prefs.edit().putInt("totalBlockedCount", value).apply()
 
     var cleanStreakDays: Int
-        get() = prefs.getInt("cleanStreakDays", 12) // ডামি ১২ দিন দেওয়া ছিল
+        get() = prefs.getInt("cleanStreakDays", 12)
         set(value) = prefs.edit().putInt("cleanStreakDays", value).apply()
 
     // ==========================================
-    // Lists (Custom Keywords, Apps, Websites)
+    // 🟡 LISTS (General Blocks vs Deep Study Allows)
     // ==========================================
     var userCustomAdultKeywords: List<String>
         get() = prefs.getStringSet("userCustomAdultKeywords", emptySet())?.toList() ?: emptyList()
         set(value) = prefs.edit().putStringSet("userCustomAdultKeywords", value.toSet()).apply()
 
+    // সাধারণ ব্লক লিস্ট (Blacklist)
     var userWebList: List<String>
         get() = prefs.getStringSet("userWebList", setOf("facebook.com", "tiktok.com", "instagram.com"))?.toList() ?: listOf("facebook.com", "tiktok.com", "instagram.com")
         set(value) = prefs.edit().putStringSet("userWebList", value.toSet()).apply()
 
     var userAppList: List<String>
-        get() = prefs.getStringSet("userAppList", setOf("com.whatsapp", "com.facebook.katana"))?.toList() ?: listOf("com.whatsapp", "com.facebook.katana")
+        get() = prefs.getStringSet("userAppList", setOf("com.whatsapp", "com.facebook.katana", "com.zhiliaoapp.musically"))?.toList() ?: listOf("com.whatsapp", "com.facebook.katana", "com.zhiliaoapp.musically")
         set(value) = prefs.edit().putStringSet("userAppList", value.toSet()).apply()
+
+    // ডিপ স্টাডি অ্যালাউ লিস্ট (Whitelist) - এটি সম্পূর্ণ আলাদা!
+    var dsAllowWebList: List<String>
+        get() = prefs.getStringSet("dsAllowWebList", setOf("wikipedia.org", "github.com", "stackoverflow.com"))?.toList() ?: listOf("wikipedia.org", "github.com", "stackoverflow.com")
+        set(value) = prefs.edit().putStringSet("dsAllowWebList", value.toSet()).apply()
+
+    var dsAllowAppList: List<String>
+        get() = prefs.getStringSet("dsAllowAppList", setOf("com.android.calculator2", "com.google.android.calendar"))?.toList() ?: listOf("com.android.calculator2", "com.google.android.calendar")
+        set(value) = prefs.edit().putStringSet("dsAllowAppList", value.toSet()).apply()
 }
