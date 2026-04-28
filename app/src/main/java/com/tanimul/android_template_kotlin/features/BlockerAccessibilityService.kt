@@ -53,6 +53,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         "youporn.com", "brazzers.com", "spankbang.com", "eporner.com", "chaturbate.com"
     )
 
+    // 🟢 NEW: File based dynamic keyword list
+    private var dynamicAdultList = listOf<String>()
+
     private val muslimQuotesBn = listOf("মুমিনদের বলুন, তারা যেন তাদের দৃষ্টি নত রাখে...", "লজ্জাশীলতা ঈমানের অঙ্গ।")
     private val muslimQuotesEn = listOf("Tell the believing men to reduce their vision...", "Modesty is a branch of faith.")
     private val hinduQuotesBn = listOf("যে মনকে নিয়ন্ত্রণ করতে পারে গঠন, তার মন তার সবচেয়ে বড় শত্রু।", "কাম, ক্রোধ এবং লোভ—এই তিনটি নরকের দ্বার।")
@@ -78,21 +81,20 @@ class BlockerAccessibilityService : AccessibilityService() {
     // ==========================================
     private var lastPeriodicPopupTime: Long = System.currentTimeMillis()
     
-    // 🟢 Cooldown timer to prevent infinite block loops
-    private var lastAdultBlockTime: Long = 0
+    // 🟢 Cooldown timer to prevent ALL block loops
+    private var lastBlockTime: Long = 0
     
     private var isDeepStudyActive = false
     private var isDeepStudyBreak = false
     
     private var windowManager: android.view.WindowManager? = null
-    private var overlayView: android.view.View? = null
     private var dsTimer: android.os.CountDownTimer? = null
     private var dsTimeLeftMillis: Long = 0
     private var floatingTimerView: android.view.View? = null
     private var timerTextView: android.widget.TextView? = null
     private var breakScreenView: android.view.View? = null
     private var sessionCompleteView: android.view.View? = null
-    private var fullScreenHadithView: android.view.View? = null
+    private var fullScreenBlockView: android.view.View? = null // 🟢 Single view for all blocks
 
     private var audioTrack: android.media.AudioTrack? = null
     private var isPlayingNoise = false
@@ -110,6 +112,19 @@ class BlockerAccessibilityService : AccessibilityService() {
         DataManager.init(this)
         recoveryPrefs = getSharedPreferences("FocusRecovery", Context.MODE_PRIVATE)
         createNotificationChannel()
+        loadAdultSiteFile() // 🟢 Load text file
+    }
+
+    private fun loadAdultSiteFile() {
+        try {
+            val inputStream = assets.open("adultsite.txt")
+            val text = inputStream.bufferedReader().use { it.readText() }
+            dynamicAdultList = text.split("\n", "\r\n")
+                .map { it.trim().lowercase().replace("*.", ".") } 
+                .filter { it.isNotEmpty() }
+        } catch (e: Exception) {
+            android.util.Log.e("RasFocus", "Error reading adultsite.txt")
+        }
     }
 
     override fun onServiceConnected() {
@@ -185,15 +200,21 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // 🟢 This guarantees that if ANY block mode is active, the service processes it.
         if (event == null || (!DataManager.isFocusActive && !DataManager.isAdultFocusActive && !isDeepStudyActive)) return
 
         val packageName = event.packageName?.toString() ?: return
 
+        // 🟢 1. Typing Detection
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) {
             val source = event.source
             val typedText = event.text.joinToString(" ").lowercase()
 
-            if (!isSystemApp(packageName) && DataManager.isAdultFocusActive && hardcoreKeywords.any { typedText.contains(it) }) {
+            val isDynamicTypingMatch = dynamicAdultList.any { typedText.contains(it) }
+
+            if (!isSystemApp(packageName) && DataManager.isAdultFocusActive && 
+                (hardcoreKeywords.any { typedText.contains(it) } || isDynamicTypingMatch)) {
+                
                 source?.let { node ->
                     val selectArgs = android.os.Bundle()
                     selectArgs.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
@@ -204,7 +225,7 @@ class BlockerAccessibilityService : AccessibilityService() {
                     clearArgs.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
                     node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
                 }
-                triggerAdultBlockAction(packageName)
+                triggerAdultBlockAction(packageName, "Explicit Keyword Typed")
                 return
             }
         }
@@ -218,6 +239,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // 🟢 2. Window Content/URL Detection
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED || 
             event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             
@@ -257,6 +279,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         return ""
     }
 
+    // ==========================================
+    // 🟢 DEEP STUDY BLOCKING LOGIC
+    // ==========================================
     private fun checkDeepStudyBlocking(packageName: String, url: String) {
         if (isSystemApp(packageName)) return
 
@@ -269,15 +294,24 @@ class BlockerAccessibilityService : AccessibilityService() {
         val pauseDuringBreak = isDeepStudyBreak && !DataManager.dsKeepBlockingInBreak
 
         if (!isAppAllowed && !isWebAllowed && !pauseDuringBreak) {
+            if (System.currentTimeMillis() - lastBlockTime < 5000) return
+            lastBlockTime = System.currentTimeMillis()
+
             val goBackSuccess = performGlobalAction(GLOBAL_ACTION_BACK)
             if (!goBackSuccess) performGlobalAction(GLOBAL_ACTION_HOME)
             
-            val quoteList = if (DataManager.adultLanguage == 0) motivationalQuotesBn else motivationalQuotesEn
-            val randomQuote = quoteList[Random.nextInt(quoteList.size)]
-            showWarningPopup(randomQuote, false, true)
+            showFullScreenBlockPopup(
+                title = "STAY FOCUSED!", 
+                message = getMotivationalQuote(), 
+                reasonInfo = "Reason: App/Website is restricted during Deep Study.", 
+                bgColorHex = "#4A00E0" // Deep Blue/Purple for study
+            )
         }
     }
 
+    // ==========================================
+    // 🟢 NORMAL BLOCKING LOGIC
+    // ==========================================
     private fun checkAndBlockContent(packageName: String, url: String, screenText: String) {
         var shouldBlockNormal = false
         var isAdultViolation = false
@@ -289,15 +323,19 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // 🟢 Adult Check works as long as AdultFocus is active
         if (DataManager.isAdultFocusActive && !shouldBlockNormal) {
-            if (adultWebsites.any { url.contains(it) || screenText.contains(it.substringBefore(".")) }) {
-                isAdultViolation = true
+            if (dynamicAdultList.any { url.contains(it) || screenText.contains(it) }) {
+                isAdultViolation = true; blockReason = "Restricted Website / Keyword"
+            }
+            else if (adultWebsites.any { url.contains(it) || screenText.contains(it.substringBefore(".")) }) {
+                isAdultViolation = true; blockReason = "Adult Website Detected"
             }
             else if (hardcoreKeywords.any { url.contains(it) || screenText.contains(it) }) {
-                isAdultViolation = true
+                isAdultViolation = true; blockReason = "Explicit Keyword Detected"
             }
             else if (romanticKeywords.any { url.contains(it) || screenText.contains(it) }) {
-                isAdultViolation = true
+                isAdultViolation = true; blockReason = "Softcore/Romantic Content Detected"
             }
             else if ((packageName.contains("youtube") && screenText.contains("shorts")) || url.contains("shorts")) {
                 shouldBlockNormal = true; blockReason = "YouTube Shorts are blocked!"
@@ -307,6 +345,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // 🟢 Normal Focus App/Web Block
         if (DataManager.isFocusActive && !shouldBlockNormal && !isAdultViolation && url.isNotEmpty()) {
             for (web in DataManager.userWebList) {
                 val coreName = if (web.contains(".")) web.substringBefore(".") else web
@@ -330,18 +369,28 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
         }
 
+        // 🟢 Executing Full Screen Blocks
         if (isAdultViolation) {
-            triggerAdultBlockAction(packageName)
+            triggerAdultBlockAction(packageName, blockReason)
         } else if (shouldBlockNormal) {
+            if (System.currentTimeMillis() - lastBlockTime < 5000) return
+            lastBlockTime = System.currentTimeMillis()
+
             performGlobalAction(GLOBAL_ACTION_HOME) 
-            showWarningPopup(if (!DataManager.showQuotes) blockReason else getReligiousQuote(), true, false)
+            
+            val mainMsg = if (DataManager.showQuotes) getReligiousQuote() else getMotivationalQuote()
+            showFullScreenBlockPopup(
+                title = "ACCESS DENIED!", 
+                message = mainMsg, 
+                reasonInfo = "Reason: $blockReason", 
+                bgColorHex = "#0CA8B0" // Teal Color for normal blocks
+            )
         }
     }
 
-    private fun triggerAdultBlockAction(packageName: String) {
-        // 🟢 Prevent infinite loop: 4 seconds cooldown between adult blocks
-        if (System.currentTimeMillis() - lastAdultBlockTime < 4000) return
-        lastAdultBlockTime = System.currentTimeMillis()
+    private fun triggerAdultBlockAction(packageName: String, reason: String) {
+        if (System.currentTimeMillis() - lastBlockTime < 5000) return
+        lastBlockTime = System.currentTimeMillis()
 
         val isBrowser = packageName.contains("chrome") || packageName.contains("browser") || 
                         packageName.contains("edge") || packageName.contains("firefox")
@@ -357,7 +406,12 @@ class BlockerAccessibilityService : AccessibilityService() {
         DataManager.totalBlockedCount++
         DataManager.cleanStreakDays = 0 
         
-        showFullScreenHadithPopup(getReligiousQuote())
+        showFullScreenBlockPopup(
+            title = "ASTAGFIRULLAH!", 
+            message = getReligiousQuote(), 
+            reasonInfo = "Reason: $reason", 
+            bgColorHex = "#F12B2C" // Red for Adult
+        )
     }
 
     private fun getReligiousQuote(): String {
@@ -370,6 +424,11 @@ class BlockerAccessibilityService : AccessibilityService() {
         return quotesList[Random.nextInt(quotesList.size)]
     }
 
+    private fun getMotivationalQuote(): String {
+        val quoteList = if (DataManager.adultLanguage == 0) motivationalQuotesBn else motivationalQuotesEn
+        return quoteList[Random.nextInt(quoteList.size)]
+    }
+
     fun tryStopFocus(inputPassword: String): Boolean {
         if (DataManager.is24HourLockActive) return false 
         val prefs = getSharedPreferences("RasFocusData", Context.MODE_PRIVATE)
@@ -380,6 +439,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         } else { DataManager.isAdultFocusActive = false; true }
     }
 
+    // ==========================================
+    // DEEP STUDY ENGINE
+    // ==========================================
     fun startDeepStudySession(focusMinutes: Int, playSound: Boolean, soundType: Int = 0) {
         val timeMillis = focusMinutes * 60 * 1000L
         resumeDeepStudySession(timeMillis, playSound, soundType)
@@ -398,7 +460,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         dsTimer = object : android.os.CountDownTimer(timeMillis, 30) {
             override fun onTick(millisUntilFinished: Long) {
                 dsTimeLeftMillis = millisUntilFinished; updateFloatingTimerText(millisUntilFinished)
-                if (millisUntilFinished in 59000..60030) showWarningPopup("⏳ Just 1 Minute Remaining! Keep Going!", false, true)
+                if (millisUntilFinished in 59000..60030) {
+                    showFullScreenBlockPopup("KEEP GOING!", "⏳ Just 1 Minute Remaining!", "Reason: Deep Study Session Alert", "#4A00E0")
+                }
             }
             override fun onFinish() {
                 stopAmbientSound(); removeFloatingTimer()
@@ -428,7 +492,8 @@ class BlockerAccessibilityService : AccessibilityService() {
                 isDeepStudyActive = false; DataManager.isDeepStudyStrict = false
                 recoveryPrefs.edit().clear().apply() 
                 updateNotification("Protection is Active", "Monitoring your focus...") 
-                showWarningPopup("🎉 Break Completed! Ready to focus?", false, true)
+                
+                showFullScreenBlockPopup("TIME'S UP!", "🎉 Break Completed! Ready to focus?", "Reason: Deep Study Break Ended", "#0CA8B0")
                 sendBroadcast(Intent("POMODORO_SESSION_UPDATE"))
             }
         }.start()
@@ -655,12 +720,12 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     // ==========================================
-    // 🟢 NEW: 3 SECONDS AUTO CLOSE & RELIABLE TOUCH
+    // 🟢 UNIFIED FULL SCREEN BLOCK POPUP FOR ALL MODES
     // ==========================================
-    private fun showFullScreenHadithPopup(message: String) {
+    private fun showFullScreenBlockPopup(title: String, message: String, reasonInfo: String, bgColorHex: String) {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
-            removeFullScreenHadithPopup() 
+            removeFullScreenBlockPopup() 
             windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
             
             val windowParams = android.view.WindowManager.LayoutParams(
@@ -674,103 +739,62 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             val layout = android.widget.LinearLayout(this).apply {
                 orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
-                setBackgroundColor(android.graphics.Color.parseColor("#F12B2C")) 
+                setBackgroundColor(android.graphics.Color.parseColor(bgColorHex)) 
                 setPadding(60, 60, 60, 60)
                 isClickable = true
                 isFocusable = true
             }
 
             val iconView = android.widget.TextView(this).apply {
-                text = "⚠️"; textSize = 60f; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 20)
+                text = if (bgColorHex == "#F12B2C") "⚠️" else "🛡️"
+                textSize = 60f; gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 20)
             }
 
             val titleView = android.widget.TextView(this).apply {
-                text = "ASTAGFIRULLAH!"; textSize = 35f; setTextColor(android.graphics.Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD); gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 40)
+                text = title; textSize = 35f; setTextColor(android.graphics.Color.WHITE)
+                setTypeface(null, android.graphics.Typeface.BOLD); gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 30)
             }
 
             val reasonView = android.widget.TextView(this).apply {
                 text = message; textSize = 22f; setTextColor(android.graphics.Color.WHITE)
+                gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 40)
+            }
+            
+            // 🟢 Explaining EXACTLY why it was blocked at the bottom
+            val infoView = android.widget.TextView(this).apply {
+                text = reasonInfo; textSize = 14f; setTextColor(android.graphics.Color.parseColor("#E2E8F0"))
                 gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, 80)
+                setTypeface(null, android.graphics.Typeface.ITALIC)
             }
 
             val btnClose = android.widget.Button(this).apply {
-                text = "I Understand & Close"; setTextColor(android.graphics.Color.parseColor("#F12B2C"))
+                text = "I Understand & Close"; setTextColor(android.graphics.Color.parseColor(bgColorHex))
                 val btnShape = android.graphics.drawable.GradientDrawable(); btnShape.cornerRadius = 24f; btnShape.setColor(android.graphics.Color.WHITE)
                 background = btnShape
                 layoutParams = android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 150)
                 
                 setOnTouchListener { _, event ->
                     if (event.action == MotionEvent.ACTION_UP) {
-                        removeFullScreenHadithPopup()
+                        removeFullScreenBlockPopup()
                     }
                     true
                 }
             }
 
-            layout.addView(iconView); layout.addView(titleView); layout.addView(reasonView); layout.addView(btnClose)
-            fullScreenHadithView = layout
-            try { windowManager?.addView(fullScreenHadithView, windowParams) } catch (e: Exception) {}
+            layout.addView(iconView); layout.addView(titleView); layout.addView(reasonView); layout.addView(infoView); layout.addView(btnClose)
+            fullScreenBlockView = layout
+            try { windowManager?.addView(fullScreenBlockView, windowParams) } catch (e: Exception) {}
             
-            // 🟢 Auto close the Full Screen block after 3 seconds
-            handler.postDelayed({
-                removeFullScreenHadithPopup()
-            }, 3000)
+            // 🟢 Auto close after 3 seconds
+            handler.postDelayed({ removeFullScreenBlockPopup() }, 3000)
         }
     }
 
-    private fun removeFullScreenHadithPopup() {
+    private fun removeFullScreenBlockPopup() {
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         handler.post {
-            fullScreenHadithView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }
-            fullScreenHadithView = null
-        }
-    }
-
-    // ==========================================
-    // Crash-Free Fast Popup Overlay (Standard)
-    // ==========================================
-    private fun showWarningPopup(message: String, isSecurityWarning: Boolean, isDeepStudyMode: Boolean) {
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        handler.post {
-            removeWarningPopup()
-            windowManager = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-            val windowParams = android.view.WindowManager.LayoutParams(
-                android.view.WindowManager.LayoutParams.MATCH_PARENT, android.view.WindowManager.LayoutParams.WRAP_CONTENT,
-                android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 
-                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                android.graphics.PixelFormat.TRANSLUCENT
-            ).apply { gravity = android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL; y = 150 }
-
-            val linearLayout = android.widget.LinearLayout(this).apply {
-                orientation = android.widget.LinearLayout.VERTICAL
-                val bgColor = if (isSecurityWarning) "#E74C3C" else if (isDeepStudyMode) "#4A00E0" else "#0CA8B0" 
-                setBackgroundColor(android.graphics.Color.parseColor(bgColor)); setPadding(50, 50, 50, 50)
-            }
-
-            val titleView = android.widget.TextView(this).apply {
-                text = if (isSecurityWarning) "ACCESS DENIED!" else if (isDeepStudyMode) "STAY FOCUSED!" else "FOCUS ACTIVE!"
-                textSize = 20f; setTextColor(android.graphics.Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD); gravity = android.view.Gravity.CENTER
-            }
-
-            val reasonView = android.widget.TextView(this).apply {
-                text = message; textSize = 15f; setTextColor(android.graphics.Color.WHITE)
-                gravity = android.view.Gravity.CENTER; setPadding(0, 20, 0, 10)
-            }
-
-            linearLayout.addView(titleView); linearLayout.addView(reasonView); overlayView = linearLayout
-            try { windowManager?.addView(overlayView, windowParams) } catch (e: Exception) {}
-            
-            // 🟢 Normal warning popup also disappears after 3 seconds
-            handler.postDelayed({ removeWarningPopup() }, 3000) 
-        }
-    }
-
-    private fun removeWarningPopup() {
-        if (overlayView != null && windowManager != null) {
-            try { windowManager?.removeView(overlayView) } catch (e: Exception) {}
-            overlayView = null
+            fullScreenBlockView?.let { try { windowManager?.removeView(it) } catch (e: Exception) {} }
+            fullScreenBlockView = null
         }
     }
 
